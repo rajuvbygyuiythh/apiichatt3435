@@ -63,6 +63,42 @@ $("site-driver-load").click();
 await wait(400);
 ok("driver viewer filled", !$("site-driver-code").hidden && $("site-driver-code").textContent.includes("site.json"));
 
+// ---------- step 3: diagnostics ----------
+window.document.querySelector('[data-subpanel="show-site"]').click();
+await wait(400);
+const diagItems = [...window.document.querySelectorAll("#site-diag-checks .diag-item")];
+ok("diagnostics rendered", diagItems.length >= 7, diagItems.length + " checks");
+ok("diagnostics keeps check order", diagItems[0].dataset.check === "site.json parsed");
+ok("diagnostics badge", /ready|attention/.test($("site-diag-badge").textContent), $("site-diag-badge").textContent);
+ok("diagnostics coverage text", $("site-diag-coverage").textContent.includes("/11"), $("site-diag-coverage").textContent);
+ok("diagnostics sequences counted", $("site-diag-sequences").textContent.includes("3"), $("site-diag-sequences").textContent);
+$("site-diag-refresh").click();
+await wait(400);
+ok("diagnostics refresh", window.document.querySelectorAll("#site-diag-checks .diag-item").length >= 7);
+
+// switching site reloads diagnostics for that site
+const camgoCard = [...window.document.querySelectorAll(".site-card")].find((c) => c.dataset.site === "camgo");
+camgoCard.querySelector("input").dispatchEvent(new window.Event("change"));
+await wait(400);
+ok("diagnostics follow site switch", $("site-diag-coverage").textContent.length > 0);
+
+// ---------- step 3: sessions ----------
+window.document.querySelector('[data-subpanel="worker-accounts"]').click();
+await wait(300);
+$("sess-site").value = "omezy";
+$("sess-site").dispatchEvent(new window.Event("change"));
+await wait(300);
+ok("session rows", $("sess-table-body").querySelectorAll("tr").length === 2, $("sess-table-body").querySelectorAll("tr").length + " rows");
+ok("session profile cell", $("sess-table-body").textContent.includes("default"));
+const deleteButtons = [...$("sess-table-body").querySelectorAll("button")];
+deleteButtons[deleteButtons.length - 1].click();
+await wait(500);
+ok("session deleted", $("sess-table-body").querySelectorAll("tr").length === 1, $("sess-table-body").textContent);
+
+// log site filter options exist
+ok("show log site options", $("show-log-site").options.length >= 5);
+ok("worker log site options", $("worker-log-site").options.length >= 5);
+
 // worker: selection + accounts
 window.document.querySelector('.nav-button[data-tab="worker"]').click();
 await wait(200);
@@ -102,6 +138,17 @@ $("worker-log-filter").value = "io";
 $("worker-log-filter").dispatchEvent(new window.Event("change"));
 await wait(150);
 ok("filter narrows", $("worker-log-list").children.length <= 6);
+$("worker-log-filter").value = "all";
+$("worker-log-filter").dispatchEvent(new window.Event("change"));
+const seenSites = [...window.document.querySelectorAll("#worker-log-list .log-meta")].map((el) => el.textContent.split(" · ")[0]);
+const siteOption = [...$("worker-log-site").options].map((o) => o.value).find((v) => v !== "all" && seenSites.includes(v)) || "all";
+$("worker-log-site").value = siteOption;
+$("worker-log-site").dispatchEvent(new window.Event("change"));
+await wait(150);
+const siteRows = [...window.document.querySelectorAll("#worker-log-list .log-meta")].map((el) => el.textContent);
+ok("site filter shows only one site", siteRows.length > 0 && siteRows.every((t) => t.includes(siteOption)), siteOption + " · " + siteRows.length + " rows");
+$("worker-log-site").value = "all";
+$("worker-log-site").dispatchEvent(new window.Event("change"));
 $("worker-log-filter").value = "all";
 $("worker-log-filter").dispatchEvent(new window.Event("change"));
 $("worker-stop").click();

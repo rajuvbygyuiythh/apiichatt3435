@@ -144,3 +144,21 @@ sites/<id>/
    per-mode ring only needs a filter, not a new store.
 5. **Status is computed from disk** (`accounts/`, `profiles/`, `dom_driver.js`), not from a
    saved string, so the badge can never lie after a manual folder edit.
+
+---
+
+## 9 · Step 3 additions — depth + hardening (frozen with this step)
+
+| Area | What changed | Why |
+|---|---|---|
+| **File log** (`internal/core/filelog.go`) | every event is appended to `data/logs.txt` as `time \| source \| LEVEL \| message`; 6 secret regexes redact `api_key`, `token`, `password`, `bearer`, `user:pass@host` before writing | a desktop app has no console; the user must be able to read last night's trace. Redaction is done at the single write path (`App.logf`) so no caller can bypass it |
+| **Sessions** (`internal/core/session.go`) | `sites/<id>/profiles/<profile>/session.json` created/listed/deleted; counters for cookies + local storage; `created_at` preserved on re-save | step 4's browser driver needs a stable per-profile home; the panel already proves the folder layout is right |
+| **Diagnostics** (`internal/core/diagnostics.go`) | 8–9 checks per site (json, enabled, https start URL, driver bytes, selector coverage ≥6/11, protection note, accounts-or-session, sequences, last probe), plus latency history (ring of 10) and the last probe payload | "ready" must mean *driveable*, not *reachable*; the selector count is the part that silently rots when a family template changes |
+| **Richer probe** | status + `final_url` + redirect hops + `<title>` + byte count + DOM markers (textarea / contenteditable / socket.io / websocket / chat / messages); `ready` = 2xx **and** at least one marker | cheap, transport-level readiness. It is intentionally *not* a substitute for the step-4 browser driver |
+| **Folder strategy is real** | `LoadFolder` returns `{count,names,sequences:[{name,lines}],total,dir}`; the runner picks a script by site index when `strategy=folder`, and logs which file it used; empty folder falls back to the inline sequence with a `skip` log | the strategy existed in the UI since step 2 but only fed the inline text; now the folder is the source of truth |
+| **UI** | diagnostics block in Show ▸ Site (checks with ✓/✕, badge, coverage/latency/sequences), Saved-sessions table in Worker ▸ Accounts (reload + delete), per-site filter on both log views, backend pill shows `v0.3.0-step3` | the new backend surface has to be visible; the log filter is the cheapest debugging win for 5 sites |
+| **Site list** | each site now carries `diag_ready`, `selector_filled/total`, `sessions`, `sequences` | the Sites table/cards can show drift without opening the diagnostics panel |
+
+New API methods (same one-object-argument rule): `GetSiteDiagnostics({site_id})` (no id →
+all sites), `GetSessions({site_id})`, `SaveSession({site_id,profile,values})`,
+`DeleteSession({site_id,profile})`. Mock backend implements all four with identical shapes.

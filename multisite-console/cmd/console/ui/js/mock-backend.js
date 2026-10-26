@@ -14,6 +14,7 @@
       entry_flow: "Select Text Chat toggle -> Add interests -> Start",
       protection_summary: "Video-first platform; text panel only appears after Start. Wait for the composer before sending.",
       accounts: 2, has_session: true, driver_bytes: 14210, status: "ready",
+      diag_ready: true, selector_filled: 8, selector_total: 11, sessions: 1, sequences: 3,
     },
     {
       id: "chat42", name: "Chat42.com (Instant Name -> 1v1)", family: "family_d", account_mode: "auto_register",
@@ -21,6 +22,7 @@
       entry_flow: "Pick a name -> 18+ tick -> Start chat",
       protection_summary: "Nickname form is required before the room opens; reuse the saved profile to skip it.",
       accounts: 1, has_session: false, driver_bytes: 13880, status: "ready",
+      diag_ready: false, selector_filled: 7, selector_total: 11, sessions: 0, sequences: 3,
     },
     {
       id: "chatusa", name: "ChatUSA.club (Fast Stranger Match)", family: "family_e", account_mode: "auto_register",
@@ -28,6 +30,7 @@
       entry_flow: "Open stranger-chat -> start matching",
       protection_summary: "Very fast match cycle; cap actions per minute and keep replies paced.",
       accounts: 0, has_session: false, driver_bytes: 13542, status: "needs-setup",
+      diag_ready: false, selector_filled: 6, selector_total: 11, sessions: 0, sequences: 3,
     },
     {
       id: "omezy", name: "Omezy.io (Text Roulette)", family: "family_a", account_mode: "auto_register",
@@ -35,6 +38,7 @@
       entry_flow: "Chat anonymously -> 18+ Agree modal -> Start / Esc / Send",
       protection_summary: "18+ modal blocks the composer until accepted; Escape skips, Enter sends.",
       accounts: 3, has_session: true, driver_bytes: 14502, status: "ready",
+      diag_ready: true, selector_filled: 9, selector_total: 11, sessions: 2, sequences: 3,
     },
     {
       id: "viby", name: "Viby.chat (Guest 1-on-1 Text)", family: "family_c", account_mode: "auto_register",
@@ -42,6 +46,7 @@
       entry_flow: "Guest entry -> Private 1-on-1 Text Chat",
       protection_summary: "Free guest mode allows up to 10 chats per day per browser session; clear profile storage to reset.",
       accounts: 0, has_session: false, driver_bytes: 14430, status: "needs-setup",
+      diag_ready: false, selector_filled: 6, selector_total: 11, sessions: 0, sequences: 3,
     },
   ];
 
@@ -72,6 +77,22 @@
   let timer = null;
   let stats = { sites: SITES.length, enabled: 5, accounts: 6, sessions: 2, running: 0, completed: 0, failed: 0 };
   let accountsCreated = [];
+  const latencies = {};
+  const lastProbes = {};
+  const profiles = {
+    omezy: [
+      { site_id: "omezy", profile: "default", cookies: 12, local_storage: 4, http_status: 200, note: "18+ modal accepted", updated_at: new Date().toISOString(), file_path: "sites/omezy/profiles/default/session.json" },
+      { site_id: "omezy", profile: "warmup", cookies: 9, local_storage: 2, http_status: 200, note: "kept for retry", updated_at: new Date(Date.now() - 86400000).toISOString(), file_path: "sites/omezy/profiles/warmup/session.json" },
+    ],
+    camgo: [
+      { site_id: "camgo", profile: "default", cookies: 15, local_storage: 6, http_status: 200, note: "text toggle remembered", updated_at: new Date().toISOString(), file_path: "sites/camgo/profiles/default/session.json" },
+    ],
+  };
+  const SEQUENCES = [
+    { name: "a.txt", lines: ["hey there", "what's up?", "how is your day going"] },
+    { name: "b.txt", lines: ["hi", "where are you from?", "nice"] },
+    { name: "c.txt", lines: ["hello", "do you like music?", "me too"] },
+  ];
 
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -134,7 +155,7 @@
         sites: SITES.map((site) => ({ ...site })),
         stats: { ...stats },
         runtime: {
-          running, mode: runMode, kind: "mock", data_dir: "data (demo)",
+          running, mode: runMode, kind: "mock", data_dir: "data (demo)", log_path: "data/logs.txt (demo)",
           version: "0.2.0-scaffold", started_at: "09:00:00", sites: SITES.length,
         },
       };
@@ -183,10 +204,18 @@
       const ok = site.id !== "chatusa";
       const result = {
         entry: site.start_url, ok,
+        ready: ok,
         latency_ms: 180 + Math.floor(Math.random() * 220),
         http: ok ? 200 : 403,
+        final_url: site.start_url,
+        redirects: site.id === "viby" ? 1 : 0,
+        title: ok ? `${site.name.split(" (")[0]} — chat` : "",
+        bytes: ok ? 48000 + Math.floor(Math.random() * 20000) : 900,
+        evidence: ok ? ["textarea composer", "websocket reference", "chat keyword"] : [],
         message: ok ? "HTTP 200" : "HTTP 403 (demo: protected)",
       };
+      latencies[site.id] = (latencies[site.id] || []).concat(result.latency_ms).slice(-10);
+      lastProbes[site.id] = result;
       push(ok ? "system" : "error",
         ok ? `${site.start_url} reachable · ${result.message} · ${result.latency_ms} ms`
            : `${site.start_url} returned ${result.message}`,
@@ -286,10 +315,85 @@
       };
     },
 
+    async GetSiteDiagnostics(payload) {
+      await sleep(140);
+      const site = siteByID(payload && payload.site_id);
+      if (!site) throw new Error(`unknown site "${payload && payload.site_id}"`);
+      const history = latencies[site.id] || [220, 260];
+      const probe = lastProbes[site.id] || null;
+      const checks = [
+        { name: "site.json parsed", ok: true, detail: `id=${site.id} family=${site.family} mode=${site.account_mode}` },
+        { name: "site enabled", ok: site.enabled !== false, detail: "enabled in site.json" },
+        { name: "start URL", ok: /^https:\/\//.test(site.start_url || ""), detail: site.start_url },
+        { name: "dom_driver.js", ok: (site.driver_bytes || 0) > 500, detail: `${site.driver_bytes} bytes` },
+        { name: "selector coverage", ok: (site.selector_filled || 0) >= 6, detail: `${site.selector_filled}/11 filled` },
+        { name: "protection note", ok: !!site.protection_summary, detail: "present" },
+        { name: "accounts or session", ok: (site.accounts || 0) > 0 || (site.sessions || 0) > 0, detail: `${site.accounts || 0} accounts · ${site.sessions || 0} sessions` },
+        { name: "sequence scripts", ok: SEQUENCES.length > 0, detail: `${SEQUENCES.length} file(s) in data/sequences` },
+      ];
+      if (probe) checks.push({ name: "last probe", ok: probe.ok, detail: `${probe.message} · ${probe.latency_ms} ms` });
+      return {
+        site_id: site.id, name: site.name, family: site.family, enabled: site.enabled !== false,
+        driver_bytes: site.driver_bytes || 0, site_json_valid: true,
+        selector_total: 11, selector_filled: site.selector_filled || 0,
+        empty_selectors: ["partner_name", "chat_ended_text"],
+        selectors: {},
+        protection_note: site.protection_summary || "",
+        accounts: site.accounts || 0, sessions: (profiles[site.id] || []).length,
+        checks, last_probe: probe || undefined,
+        latency_history: history.slice(-10),
+        sequence_files: SEQUENCES.map((seq) => seq.name),
+        ready: checks.every((check) => check.ok),
+      };
+    },
+
+    async GetSessions(payload) {
+      await sleep(90);
+      const site = siteByID(payload && payload.site_id);
+      if (!site) throw new Error(`unknown site "${payload && payload.site_id}"`);
+      const list = (profiles[site.id] || []).map((session) => ({ ...session }));
+      return { site_id: site.id, sessions: list, count: list.length };
+    },
+
+    async SaveSession(payload) {
+      await sleep(120);
+      const site = siteByID(payload && payload.site_id);
+      if (!site) throw new Error(`unknown site "${payload && payload.site_id}"`);
+      const session = {
+        site_id: site.id, profile: (payload && payload.profile) || "default",
+        cookies: 0, local_storage: 0, note: "created by console", status: "pending",
+        updated_at: new Date().toISOString(),
+        file_path: `sites/${site.id}/profiles/${(payload && payload.profile) || "default"}/session.json`,
+      };
+      profiles[site.id] = (profiles[site.id] || []).concat([session]);
+      site.sessions = profiles[site.id].length;
+      push("system", `${site.id}: session saved for profile "${session.profile}"`, "sessions", site.id);
+      return session;
+    },
+
+    async DeleteSession(payload) {
+      await sleep(110);
+      const site = siteByID(payload && payload.site_id);
+      if (!site) throw new Error(`unknown site "${payload && payload.site_id}"`);
+      const profile = payload && payload.profile;
+      if (!profile) throw new Error("missing required field: profile");
+      profiles[site.id] = (profiles[site.id] || []).filter((session) => session.profile !== profile);
+      site.sessions = profiles[site.id].length;
+      site.has_session = site.sessions > 0;
+      push("system", `${site.id}: session for "${profile}" deleted`, "sessions", site.id);
+      return { ok: true, site_id: site.id, profile };
+    },
+
     async LoadFolder() {
       await sleep(300);
-      push("system", "folder loaded: 3 sequence file(s)", "sequences", "");
-      return { count: 3, names: ["a.txt", "b.txt", "c.txt"] };
+      push("system", `folder loaded: ${SEQUENCES.length} sequence file(s) · ${SEQUENCES.reduce((sum, seq) => sum + seq.lines.length, 0)} line(s)`, "sequences", "");
+      return {
+        count: SEQUENCES.length,
+        names: SEQUENCES.map((seq) => seq.name),
+        sequences: SEQUENCES.map((seq) => ({ ...seq, lines: seq.lines.slice() })),
+        total: SEQUENCES.reduce((sum, seq) => sum + seq.lines.length, 0),
+        dir: "data/sequences (demo)",
+      };
     },
 
     async OpenDataFolder() {
@@ -298,7 +402,8 @@
     },
   };
 
-  push("system", "console started · 5 sites · backend mock", "0.2.0-scaffold", "");
+  push("system", "console started · 5 sites · backend mock", "0.3.0-step3", "");
+  push("system", "file log at data/logs.txt (demo)", "applog", "");
   push("system", "settings at data/settings.json (demo)", "storage", "");
   recomputeStats();
 

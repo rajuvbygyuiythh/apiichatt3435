@@ -114,6 +114,22 @@
                 <span id="site-test-status" class="status-line" role="status" aria-live="polite">Not tested.</span>
               </div>
               <pre id="site-driver-code" class="code-block" hidden></pre>
+
+              <div class="diag-block" id="site-diag">
+                <div class="diag-head">
+                  <h3>Diagnostics</h3>
+                  <span id="site-diag-badge" class="status-pill">not loaded</span>
+                  <button id="site-diag-refresh" class="secondary-button small" type="button">Refresh</button>
+                </div>
+                <ul id="site-diag-checks" class="diag-list">
+                  <li class="hint-text">Pick a site to load its diagnostics.</li>
+                </ul>
+                <div class="diag-meta">
+                  <span id="site-diag-coverage" class="mini-stat">selectors —</span>
+                  <span id="site-diag-latency" class="mini-stat">latency —</span>
+                  <span id="site-diag-sequences" class="mini-stat">sequences —</span>
+                </div>
+              </div>
             </section>
           </div>
         </section>
@@ -270,6 +286,9 @@
               <div class="log-header">
                 <div class="step-head" style="margin: 0;"><span class="step-num">5</span><h2>Live Logs</h2></div>
                 <div class="log-tools">
+                  <select id="show-log-site" aria-label="Filter show logs by site">
+                    <option value="all">All sites</option>
+                  </select>
                   <select id="show-log-filter" aria-label="Filter show logs">
                     <option value="all">All</option>
                     <option value="io">IN / OUT</option>
@@ -401,6 +420,26 @@
                 </table>
               </div>
             </section>
+
+            <section class="card" style="margin-top: 16px;">
+              <h2>Saved sessions</h2>
+              <p class="hint-text">Read from <code>sites/&lt;id&gt;/profiles/&lt;profile&gt;/session.json</code>. Deleting a session removes only that profile folder.</p>
+              <div class="form-actions inline">
+                <label class="inline-label"><span>Site</span><select id="sess-site"></select></label>
+                <button id="sess-refresh" class="secondary-button" type="button">Reload</button>
+                <span id="sess-status" class="status-line" role="status" aria-live="polite"></span>
+              </div>
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr><th>Profile</th><th>Cookies</th><th>Local storage</th><th>Updated</th><th>Note</th><th></th></tr>
+                  </thead>
+                  <tbody id="sess-table-body">
+                    <tr><td colspan="6">No sessions loaded.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
           </div>
         </section>
 
@@ -514,6 +553,9 @@
               <div class="log-header">
                 <div class="step-head" style="margin: 0;"><span class="step-num">5</span><h2>Live Logs</h2></div>
                 <div class="log-tools">
+                  <select id="worker-log-site" aria-label="Filter worker logs by site">
+                    <option value="all">All sites</option>
+                  </select>
                   <select id="worker-log-filter" aria-label="Filter worker logs">
                     <option value="all">All</option>
                     <option value="io">IN / OUT</option>

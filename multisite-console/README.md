@@ -53,6 +53,15 @@ sites/<id>/                    the 5 sites: site.json, dom_driver.js, *_protecti
 data/                          runtime: settings.json, sequences/, (accounts are per-site)
 ```
 
+## Step 3 surface (diagnostics · sessions · file log)
+
+- `GET /api/GetSiteDiagnostics?id=<site>` — 8–9 pass/fail checks, 11-selector coverage,
+  latency history, last probe, sequence files, `ready` flag.
+- `GET /api/GetSessions?id=<site>` · `POST /api/SaveSession` · `POST /api/DeleteSession` —
+  sessions live in `sites/<id>/profiles/<profile>/session.json`.
+- Every log event is mirrored to `data/logs.txt` with secrets redacted.
+- Message strategy `folder` now reads `data/sequences/*.txt` for real (round-robin per site).
+
 ## Contract (all calls take one object argument)
 
 `GetSnapshot` · `SaveSettings{section,values}` · `GetLogs{after}` · `ClearLogs` ·

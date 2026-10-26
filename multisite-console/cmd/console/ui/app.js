@@ -20,8 +20,13 @@
 //    LaunchLogin({site_id, profile})                -> {ok}
 //    AutoRegisterAccounts({site_id, count})         -> {accounts:[…], count}
 //    GetSiteDriver({site_id})                       -> {dom_driver_js, site_json, protection_note}
-//    LoadFolder()                                   -> {count, names}
+//    LoadFolder()                                   -> {count, names, sequences:[{name,lines}], total}
 //    OpenDataFolder()                               -> {path}
+//  Step-3 additions:
+//    GetSiteDiagnostics({site_id})                  -> SiteDiagnostics
+//    GetSessions({site_id})                         -> {site_id, sessions:[…], count}
+//    SaveSession({site_id, profile, values})        -> SiteSession
+//    DeleteSession({site_id, profile})              -> {ok}
 // =============================================================================
 
 const CONFIG = {
@@ -51,6 +56,9 @@ const state = {
   selectedSites: [],
   accounts: [],
   bridgeKind: "unknown",
+  diagnostics: null,
+  diagSiteID: "",
+  sessions: [],
 };
 
 // Every input/select/textarea with an id inside a panel is mirrored here so
@@ -414,6 +422,9 @@ function applySnapshot(snapshot) {
   renderSiteCheckList(snapshot.sites || []);
   renderSiteTable(snapshot.sites || []);
   renderAccountSiteSelect(snapshot.sites || []);
+  fillSiteSelect("show-log-site", snapshot.sites || []);
+  fillSiteSelect("worker-log-site", snapshot.sites || []);
+  fillSessionSiteSelect(snapshot.sites || []);
 
   // Stats + runtime
   renderStats(snapshot.stats || {});
@@ -452,6 +463,168 @@ function setMessageStrategy(prefix, strategy) {
   }
 }
 
+// --- step 3: site filters, sessions, diagnostics ----------------------------
+function fillSiteSelect(selectId, sites, keepValue) {
+  const el = byId(selectId);
+  if (!el) return;
+  const previous = keepValue !== undefined ? keepValue : el.value;
+  const fragment = document.createDocumentFragment();
+  const all = document.createElement("option");
+  all.value = "all";
+  all.textContent = "All sites";
+  fragment.appendChild(all);
+  sites.forEach((site) => {
+    const option = document.createElement("option");
+    option.value = site.id;
+    option.textContent = site.name || site.id;
+    fragment.appendChild(option);
+  });
+  el.replaceChildren(fragment);
+  el.value = previous && Array.from(el.options).some((o) => o.value === previous) ? previous : "all";
+}
+
+function fillSessionSiteSelect(sites) {
+  const el = byId("sess-site");
+  if (!el) return;
+  const previous = el.value || state.selectedSite;
+  const fragment = document.createDocumentFragment();
+  sites.forEach((site) => {
+    const option = document.createElement("option");
+    option.value = site.id;
+    option.textContent = site.name || site.id;
+    fragment.appendChild(option);
+  });
+  el.replaceChildren(fragment);
+  if (previous && sites.some((site) => site.id === previous)) el.value = previous;
+}
+
+function renderDiagnostics(diag) {
+  const list = byId("site-diag-checks");
+  const badge = byId("site-diag-badge");
+  if (!list || !badge) return;
+  if (!diag) {
+    list.replaceChildren();
+    const li = document.createElement("li");
+    li.className = "hint-text";
+    li.textContent = "Pick a site to load its diagnostics.";
+    list.appendChild(li);
+    badge.textContent = "not loaded";
+    badge.className = "status-pill";
+    return;
+  }
+  state.diagnostics = diag;
+  state.diagSiteID = diag.site_id || "";
+  badge.textContent = diag.ready ? "ready" : "attention";
+  badge.className = "status-pill " + (diag.ready ? "ok" : "warn");
+
+  const fragment = document.createDocumentFragment();
+  (diag.checks || []).forEach((check) => {
+    const li = document.createElement("li");
+    li.className = "diag-item " + (check.ok ? "ok" : "bad");
+    li.dataset.check = check.name;
+    const mark = document.createElement("span");
+    mark.className = "diag-mark";
+    mark.textContent = check.ok ? "✓" : "✕";
+    const name = document.createElement("span");
+    name.className = "diag-name";
+    name.textContent = check.name;
+    const detail = document.createElement("span");
+    detail.className = "diag-detail";
+    detail.textContent = check.detail || "";
+    li.append(mark, name, detail);
+    fragment.appendChild(li);
+  });
+  list.replaceChildren(fragment);
+
+  byId("site-diag-coverage").textContent = `selectors ${diag.selector_filled}/${diag.selector_total}`;
+  const history = diag.latency_history || [];
+  byId("site-diag-latency").textContent = history.length
+    ? `latency ${history[history.length - 1]} ms · ${history.length} probe(s)`
+    : "latency —";
+  byId("site-diag-sequences").textContent = `sequences ${(diag.sequence_files || []).length}`;
+}
+
+async function loadDiagnostics(siteID, silent) {
+  const id = siteID || state.selectedSite;
+  if (!id) return;
+  try {
+    const diag = await bridge.invoke("GetSiteDiagnostics", { site_id: id });
+    renderDiagnostics(diag);
+    if (!silent) setStatus("site-test-status", `Diagnostics loaded for ${diag.name || id}.`, "ok");
+  } catch (error) {
+    renderDiagnostics(null);
+    if (!silent) setStatus("site-test-status", error.message || String(error), "error");
+  }
+}
+
+function renderSessions(payload) {
+  const body = byId("sess-table-body");
+  if (!body) return;
+  const sessions = (payload && payload.sessions) || [];
+  state.sessions = sessions;
+  body.replaceChildren();
+  if (!sessions.length) {
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = 6;
+    cell.textContent = "No profiles yet for this site.";
+    row.appendChild(cell);
+    body.appendChild(row);
+    return;
+  }
+  sessions.forEach((session) => {
+    const row = document.createElement("tr");
+    row.dataset.profile = session.profile;
+    const cells = [
+      session.profile || "default",
+      String(session.cookies ?? 0),
+      String(session.local_storage ?? 0),
+      session.updated_at ? new Date(session.updated_at).toLocaleString() : "—",
+      session.note || "—",
+    ];
+    cells.forEach((value) => {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      row.appendChild(cell);
+    });
+    const action = document.createElement("td");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "secondary-button small";
+    button.textContent = "Delete";
+    button.addEventListener("click", () => deleteSession(session.profile));
+    action.appendChild(button);
+    row.appendChild(action);
+    body.appendChild(row);
+  });
+}
+
+async function loadSessions(silent) {
+  const el = byId("sess-site");
+  const siteID = el ? el.value : state.selectedSite;
+  if (!siteID) return;
+  try {
+    const payload = await bridge.invoke("GetSessions", { site_id: siteID });
+    renderSessions(payload);
+    if (!silent) setStatus("sess-status", `${(payload && payload.count) || 0} session(s).`, "ok");
+  } catch (error) {
+    if (!silent) setStatus("sess-status", error.message || String(error), "error");
+  }
+}
+
+async function deleteSession(profile) {
+  const siteID = byId("sess-site").value;
+  if (!siteID || !profile) return;
+  try {
+    await bridge.invoke("DeleteSession", { site_id: siteID, profile });
+    toast(`Session ${profile} deleted.`, "ok");
+    await loadSessions(true);
+    await refreshSnapshot(true, true);
+  } catch (error) {
+    setStatus("sess-status", error.message || String(error), "error");
+  }
+}
+
 // --- sites -----------------------------------------------------------------
 function renderSitePicker(sites) {
   const wrap = byId("site-picker");
@@ -474,6 +647,7 @@ function renderSitePicker(sites) {
       renderSiteFacts();
       byId("site-driver-code").hidden = true;
       setStatus("site-test-status", "Not tested.");
+      loadDiagnostics(site.id, true);
     });
 
     const top = document.createElement("div");
@@ -666,6 +840,7 @@ async function testSelectedSite() {
     setStatus("site-test-status", `${verdict} · ${result.message || "no message"} · ${result.latency_ms ?? 0} ms`,
       result.ok ? "ok" : "error");
     await refreshSnapshot(true);
+    await loadDiagnostics(siteID, true);
   } catch (error) {
     setStatus("site-test-status", error.message || String(error), "error");
   }
@@ -837,18 +1012,26 @@ function logFilterMatch(entry, filter) {
   return true;
 }
 
+function logSiteMatch(entry, siteFilter) {
+  if (!siteFilter || siteFilter === "all") return true;
+  return (entry.site || "") === siteFilter;
+}
+
 function renderLogs(prefix) {
   const list = byId(`${prefix}-log-list`);
   const filterEl = byId(`${prefix}-log-filter`);
   const emptyEl = byId(`${prefix}-log-empty`);
   if (!list) return;
   const filter = filterEl ? filterEl.value : "all";
+  const siteFilterEl = byId(`${prefix}-log-site`);
+  const siteFilter = siteFilterEl ? siteFilterEl.value : "all";
   const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
   const fragment = document.createDocumentFragment();
   let shown = 0;
 
   for (const entry of state.logs[prefix].entries) {
     if (!logFilterMatch(entry, filter)) continue;
+    if (!logSiteMatch(entry, siteFilter)) continue;
     shown += 1;
     const row = document.createElement("div");
     row.className = `log-row log-${entry.kind}`;
@@ -925,6 +1108,10 @@ async function clearLogs(prefix) {
 // ---------------------------------------------------------------------------
 // Wiring
 // ---------------------------------------------------------------------------
+async function hydrateStep3() {
+  await loadDiagnostics(state.selectedSite, true);
+  await loadSessions(true);
+}
 function bindForms() {
   byId("theme-select").value = localStorage.getItem("kit-theme") || CONFIG.theme;
   document.documentElement.dataset.theme = byId("theme-select").value;
@@ -948,6 +1135,11 @@ function bindActions() {
 
   // Show mode
   byId("site-test").addEventListener("click", testSelectedSite);
+  byId("site-diag-refresh").addEventListener("click", () => loadDiagnostics(state.selectedSite));
+  byId("show-log-site").addEventListener("change", () => renderLogs("show"));
+  byId("worker-log-site").addEventListener("change", () => renderLogs("worker"));
+  byId("sess-refresh").addEventListener("click", () => loadSessions(false));
+  byId("sess-site").addEventListener("change", () => loadSessions(false));
   byId("site-driver-load").addEventListener("click", viewDriver);
   byId("sf-save").addEventListener("click", saveShowSetting);
   byId("msg-save").addEventListener("click", () => saveSection("message", readMessage("msg"), "msg-status"));
@@ -992,6 +1184,8 @@ async function bootstrap() {
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
   }
+
+  hydrateStep3().catch(() => {});
 
   setInterval(() => refreshLogs(state.tab), CONFIG.pollLogsMs);
   setInterval(() => { refreshSnapshot(true).catch(() => {}); }, CONFIG.pollStatsMs);

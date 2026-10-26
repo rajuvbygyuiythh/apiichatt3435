@@ -137,6 +137,82 @@ func (a *App) Handler(uiDir string) http.Handler {
 		writeJSON(w, driver, err)
 	})
 
+	mux.HandleFunc("/api/GetSiteDiagnostics", func(w http.ResponseWriter, r *http.Request) {
+		siteID := r.URL.Query().Get("id")
+		if siteID == "" {
+			var req struct {
+				SiteID string `json:"site_id"`
+			}
+			_ = decodeBody(r, &req)
+			siteID = req.SiteID
+		}
+		if siteID == "" {
+			writeJSON(w, a.AllDiagnostics(), nil)
+			return
+		}
+		diag, err := a.GetSiteDiagnostics(siteID)
+		writeJSON(w, diag, err)
+	})
+
+	mux.HandleFunc("/api/GetSessions", func(w http.ResponseWriter, r *http.Request) {
+		siteID := r.URL.Query().Get("id")
+		if siteID == "" {
+			var req struct {
+				SiteID string `json:"site_id"`
+			}
+			_ = decodeBody(r, &req)
+			siteID = req.SiteID
+		}
+		if siteID == "" {
+			writeJSON(w, nil, errMissing("site_id"))
+			return
+		}
+		sessions, err := a.GetSessions(siteID)
+		writeJSON(w, map[string]any{"site_id": siteID, "sessions": sessions, "count": len(sessions)}, err)
+	})
+
+	mux.HandleFunc("/api/SaveSession", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			SiteID  string         `json:"site_id"`
+			Profile string         `json:"profile"`
+			Values  map[string]any `json:"values"`
+		}
+		if err := decodeBody(r, &req); err != nil {
+			writeJSON(w, nil, err)
+			return
+		}
+		if req.SiteID == "" {
+			writeJSON(w, nil, errMissing("site_id"))
+			return
+		}
+		if req.Profile == "" {
+			req.Profile = "default"
+		}
+		session, err := a.SaveSession(req.SiteID, req.Profile, req.Values)
+		writeJSON(w, session, err)
+	})
+
+	mux.HandleFunc("/api/DeleteSession", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			SiteID  string `json:"site_id"`
+			Profile string `json:"profile"`
+		}
+		if err := decodeBody(r, &req); err != nil {
+			writeJSON(w, nil, err)
+			return
+		}
+		if req.SiteID == "" {
+			writeJSON(w, nil, errMissing("site_id"))
+			return
+		}
+		if req.Profile == "" {
+			writeJSON(w, nil, errMissing("profile"))
+			return
+		}
+		out, err := a.DeleteSession(req.SiteID, req.Profile)
+		writeJSON(w, out, err)
+	})
+
 	mux.HandleFunc("/api/LoadFolder", func(w http.ResponseWriter, r *http.Request) {
 		out, err := a.LoadFolder()
 		writeJSON(w, out, err)
@@ -188,6 +264,14 @@ func decodeBody(r *http.Request, target any) error {
 	}
 	return json.Unmarshal(raw, target)
 }
+
+func errMissing(field string) error {
+	return &missingError{field: field}
+}
+
+type missingError struct{ field string }
+
+func (m *missingError) Error() string { return "missing required field: " + m.field }
 
 func errBadMethod(r *http.Request) error {
 	return &methodError{method: r.Method, path: r.URL.Path}

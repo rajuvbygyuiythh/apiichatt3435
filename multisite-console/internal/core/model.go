@@ -9,7 +9,7 @@ package core
 import "time"
 
 // Version is shown in the sidebar tooltip and in the API snapshot.
-const Version = "0.2.0-scaffold"
+const Version = "0.3.0-step3"
 
 // Selectors is the per-site CSS bundle used by the DOM driver.
 // Field names match sites/<id>/site.json exactly.
@@ -52,6 +52,12 @@ type SiteState struct {
 	LastTest    string `json:"last_test"`   // "12:04:31 · 200 · 412 ms" or "never"
 	HTTPStatus  int    `json:"http_status"` // last TestSite result
 	LatencyMS   int    `json:"latency_ms"`  // last TestSite result
+	// deep diagnostics summarised for the site list (step 3)
+	DiagReady      bool `json:"diag_ready"`
+	SelectorFilled int  `json:"selector_filled"`
+	SelectorTotal  int  `json:"selector_total"`
+	Sessions       int  `json:"sessions"`
+	Sequences      int  `json:"sequences"`
 }
 
 // FirstMessageSettings mirrors the original dashboard's onboarding policy.
@@ -141,6 +147,7 @@ type Runtime struct {
 	Mode      string `json:"mode"` // show | worker | ""
 	Kind      string `json:"kind"` // wails | http
 	DataDir   string `json:"data_dir"`
+	LogPath   string `json:"log_path"`
 	Version   string `json:"version"`
 	StartedAt string `json:"started_at"`
 	Sites     int    `json:"sites"`
@@ -176,11 +183,18 @@ type LogPage struct {
 
 // TestResult is one per-entry verdict (connections) or a single site probe.
 type TestResult struct {
-	Entry     string `json:"entry"`
-	OK        bool   `json:"ok"`
-	LatencyMS int    `json:"latency_ms"`
-	Message   string `json:"message"`
-	HTTP      int    `json:"http,omitempty"`
+	Entry string `json:"entry"`
+	OK    bool   `json:"ok"`
+	// Ready means "the page looks like a chat shell", not just "HTTP 200".
+	Ready     bool     `json:"ready"`
+	LatencyMS int      `json:"latency_ms"`
+	Message   string   `json:"message"`
+	HTTP      int      `json:"http,omitempty"`
+	FinalURL  string   `json:"final_url,omitempty"`
+	Redirects int      `json:"redirects,omitempty"`
+	Title     string   `json:"title,omitempty"`
+	Bytes     int      `json:"bytes,omitempty"`
+	Evidence  []string `json:"evidence,omitempty"`
 }
 
 // Account is one auto-registered identity stored in sites/<id>/accounts/.
@@ -313,4 +327,55 @@ func clampMax(v, lo, hi int) int {
 		return lo
 	}
 	return clamp(v, lo, hi)
+}
+
+// SiteSession is one saved browser session for a site profile.
+// The browser driver fills Cookies/LocalStorage in step 4; the console can list,
+// inspect and delete sessions today.
+type SiteSession struct {
+	SiteID       string    `json:"site_id"`
+	Profile      string    `json:"profile"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Cookies      int       `json:"cookies"`
+	LocalStorage int       `json:"local_storage"`
+	HTTPStatus   int       `json:"http_status,omitempty"`
+	Status       string    `json:"status,omitempty"`
+	Note         string    `json:"note,omitempty"`
+	FilePath     string    `json:"file_path"`
+}
+
+// DiagCheck is one pass/fail line of the site diagnostics panel.
+type DiagCheck struct {
+	Name   string `json:"name"`
+	OK     bool   `json:"ok"`
+	Detail string `json:"detail"`
+}
+
+// SiteDiagnostics is the deep health view of one site folder.
+type SiteDiagnostics struct {
+	SiteID         string      `json:"site_id"`
+	Name           string      `json:"name"`
+	Family         string      `json:"family"`
+	Enabled        bool        `json:"enabled"`
+	DriverBytes    int         `json:"driver_bytes"`
+	SiteJSONValid  bool        `json:"site_json_valid"`
+	SelectorTotal  int         `json:"selector_total"`
+	SelectorFilled int         `json:"selector_filled"`
+	EmptySelectors []string    `json:"empty_selectors"`
+	Selectors      Selectors   `json:"selectors"`
+	ProtectionNote string      `json:"protection_note"`
+	Accounts       int         `json:"accounts"`
+	Sessions       int         `json:"sessions"`
+	Checks         []DiagCheck `json:"checks"`
+	LastProbe      *TestResult `json:"last_probe,omitempty"`
+	LatencyHistory []int       `json:"latency_history"`
+	SequenceFiles  []string    `json:"sequence_files"`
+	Ready          bool        `json:"ready"`
+}
+
+// SequenceFile is one script loaded from data/sequences/ for the folder strategy.
+type SequenceFile struct {
+	Name  string   `json:"name"`
+	Lines []string `json:"lines"`
 }

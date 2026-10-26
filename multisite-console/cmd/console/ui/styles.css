@@ -1486,3 +1486,91 @@ kbd {
 }
 
 .mini-stat strong { color: var(--text); font-size: 12.5px; }
+
+/* ---------- step 3: diagnostics panel, session rows, small controls ---------- */
+.diag-block {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line);
+}
+
+.diag-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.diag-head h3 {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.status-pill {
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel-alt);
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.status-pill.ok { border-color: var(--accent); color: var(--accent); }
+.status-pill.warn { border-color: var(--warn, #d9a441); color: var(--warn, #d9a441); }
+
+.diag-head .secondary-button.small { margin-left: auto; }
+
+.diag-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.diag-item {
+  display: grid;
+  grid-template-columns: 18px 170px 1fr;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.diag-item.ok .diag-mark { color: var(--accent); }
+.diag-item.bad .diag-mark { color: var(--danger, #d9534f); }
+.diag-item.bad { background: rgba(217, 83, 79, 0.08); }
+
+.diag-mark { font-weight: 700; text-align: center; }
+.diag-name { color: var(--text); }
+.diag-detail { color: var(--muted); word-break: break-word; }
+
+.diag-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.secondary-button.small {
+  padding: 4px 10px;
+  font-size: 11.5px;
+}
+
+.inline-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.inline-label select { min-width: 160px; }
+
+#sess-table-body td:last-child { text-align: right; }

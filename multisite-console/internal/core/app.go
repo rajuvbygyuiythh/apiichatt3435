@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -28,8 +28,10 @@ type App struct {
 	log   *LogRing
 	sites []SiteConfig
 
+	disk      *DiskLog
 	mu        sync.Mutex
 	lastTests map[string]TestResult
+	latencies map[string][]int
 	running   bool
 	runMode   string
 	cancel    context.CancelFunc
@@ -51,22 +53,32 @@ func New(dataDir, sitesDir, kind string) (*App, error) {
 		return nil, err
 	}
 
+	disk, diskErr := OpenDiskLog(dataDir)
+
 	app := &App{
 		dataDir:    dataDir,
 		sitesDir:   sitesDir,
 		kind:       kind,
 		store:      store,
 		log:        NewLogRing(2000),
+		disk:       disk,
 		sites:      sites,
 		startedAt:  time.Now(),
+		lastTests:  map[string]TestResult{},
+		latencies:  map[string][]int{},
 		httpClient: &http.Client{Timeout: 8 * time.Second},
 	}
 
-	app.log.Append("system", fmt.Sprintf("console started · %d sites · backend %s", len(sites), kind), Version, "")
+	app.logf("system", fmt.Sprintf("console started · %d sites · backend %s", len(sites), kind), Version, "")
 	for _, problem := range problems {
-		app.log.Append("error", "site skipped: "+problem.Error(), "registry", "")
+		app.logf("error", "site skipped: "+problem.Error(), "registry", "")
 	}
-	app.log.Append("system", "settings at "+store.Path(), "storage", "")
+	app.logf("system", "settings at "+store.Path(), "storage", "")
+	if diskErr != nil {
+		app.logf("error", "file log unavailable: "+diskErr.Error(), "applog", "")
+	} else {
+		app.logf("system", "file log at "+disk.Path(), "applog", "")
+	}
 	return app, nil
 }
 
@@ -82,6 +94,42 @@ func (a *App) SitesDir() string { return a.sitesDir }
 // Log exposes the ring to the desktop event bridge.
 func (a *App) Log() *LogRing { return a.log }
 
+// LogPath is the file log location ("" when the file could not be opened).
+func (a *App) LogPath() string {
+	if a.disk == nil {
+		return ""
+	}
+	return a.disk.Path()
+}
+
+// Close flushes the file log. Called from main / the desktop shutdown hook.
+func (a *App) Close() error {
+	if a.disk == nil {
+		return nil
+	}
+	return a.disk.Close()
+}
+
+// logf is the single write path for events: ring (UI) first, then disk.
+func (a *App) logf(kind, text, meta, site string) LogEntry {
+	entry := a.log.Append(kind, text, meta, site)
+	if a.disk != nil {
+		detail := text
+		if meta != "" {
+			detail += " [" + meta + "]"
+		}
+		if site != "" {
+			detail += " <" + site + ">"
+		}
+		source := "site"
+		if site == "" {
+			source = "app"
+		}
+		a.disk.Write(source, kind, detail)
+	}
+	return entry
+}
+
 // SiteStates joins registry config with on-disk facts.
 //
 // status is deliberately simple and computed only from disk, so the dashboard
@@ -96,11 +144,14 @@ func (a *App) SiteStates() []SiteState {
 	for _, site := range a.sites {
 		base := filepath.Join(a.sitesDir, site.ID)
 		state := SiteState{
-			SiteConfig:  site,
-			Accounts:    CountFiles(filepath.Join(base, "accounts")),
-			HasSession:  DirHasFiles(filepath.Join(base, "profiles")) || DirHasFiles(filepath.Join(base, "sessions")),
-			DriverBytes: len(readFileOrEmpty(filepath.Join(base, "dom_driver.js"))),
-			LastTest:    "never",
+			SiteConfig:    site,
+			Accounts:      CountFiles(filepath.Join(base, "accounts")),
+			HasSession:    DirHasFiles(filepath.Join(base, "profiles")) || DirHasFiles(filepath.Join(base, "sessions")),
+			DriverBytes:   len(readFileOrEmpty(filepath.Join(base, "dom_driver.js"))),
+			LastTest:      "never",
+			SelectorTotal: 11,
+			Sessions:      len(profileDirs(filepath.Join(base, "profiles"))),
+			Sequences:     len(sequenceFileNames(a.dataDir)),
 		}
 		switch {
 		case !site.Enabled:
@@ -112,6 +163,9 @@ func (a *App) SiteStates() []SiteState {
 		default:
 			state.Status = "ready"
 		}
+		state.SelectorFilled, _ = SelectorCoverage(site.Selectors)
+		diag := a.buildDiagnostics(site)
+		state.DiagReady = diag.Ready
 		if a.lastTests != nil {
 			if last, ok := a.lastTests[site.ID]; ok && last.Entry != "" {
 				state.HTTPStatus = last.HTTP
@@ -165,6 +219,7 @@ func (a *App) Snapshot() Snapshot {
 			Mode:      mode,
 			Kind:      a.kind,
 			DataDir:   a.dataDir,
+			LogPath:   a.LogPath(),
 			Version:   Version,
 			StartedAt: a.startedAt.Format("15:04:05"),
 			Sites:     len(a.sites),
@@ -177,7 +232,7 @@ func (a *App) SaveSettings(section string, values json.RawMessage) (Snapshot, er
 	if _, err := a.store.Apply(section, values); err != nil {
 		return a.Snapshot(), err
 	}
-	a.log.Append("system", "settings saved: "+section, "storage", "")
+	a.logf("system", "settings saved: "+section, "storage", "")
 	return a.Snapshot(), nil
 }
 
@@ -219,15 +274,20 @@ func (a *App) probe(target, siteID string) (TestResult, error) {
 		return result, err
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) MultiSiteConsole/"+Version)
+	req.Header.Set("Accept", "text/html,application/xhtml+xml")
+
 	resp, err := a.httpClient.Do(req)
 	latency := int(time.Since(start).Milliseconds())
 	if err != nil {
 		result := TestResult{Entry: target, OK: false, LatencyMS: latency, Message: shortError(err)}
-		a.log.Append("error", fmt.Sprintf("%s unreachable (%d ms)", target, latency), shortError(err), siteID)
+		a.logf("error", fmt.Sprintf("%s unreachable (%d ms)", target, latency), shortError(err), siteID)
 		a.rememberTest(siteID, result)
+		a.rememberLatency(siteID, latency)
 		return result, nil
 	}
 	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 512*1024))
 
 	result := TestResult{
 		Entry:     target,
@@ -235,14 +295,92 @@ func (a *App) probe(target, siteID string) (TestResult, error) {
 		LatencyMS: latency,
 		HTTP:      resp.StatusCode,
 		Message:   fmt.Sprintf("HTTP %d", resp.StatusCode),
+		FinalURL:  resp.Request.URL.String(),
+		Bytes:     len(body),
 	}
-	if result.OK {
-		a.log.Append("system", fmt.Sprintf("%s reachable · HTTP %d · %d ms", hostOf(target), resp.StatusCode, latency), "site probe", siteID)
-	} else {
-		a.log.Append("error", fmt.Sprintf("%s returned HTTP %d", hostOf(target), resp.StatusCode), "site probe", siteID)
+	// Go's http.Client already followed redirects; derive the hop count from the
+	// redirect chain when it is available, else 1 when the URL changed.
+	if result.FinalURL != target {
+		result.Redirects = countRedirects(resp)
+		if result.Redirects == 0 {
+			result.Redirects = 1
+		}
+	}
+
+	result.Title = titleOf(string(body))
+	result.Evidence = domEvidence(string(body))
+	result.Ready = result.OK && len(result.Evidence) > 0
+
+	switch {
+	case !result.OK:
+		a.logf("error", fmt.Sprintf("%s returned HTTP %d", hostOf(target), resp.StatusCode), "site probe", siteID)
+	case result.Ready:
+		a.logf("system", fmt.Sprintf("%s reachable · HTTP %d · %d ms · chat markers %d", hostOf(target), resp.StatusCode, latency, len(result.Evidence)), "site probe", siteID)
+	default:
+		a.logf("skip", fmt.Sprintf("%s answered HTTP %d but no chat markers found", hostOf(target), resp.StatusCode), "site probe", siteID)
 	}
 	a.rememberTest(siteID, result)
+	a.rememberLatency(siteID, latency)
 	return result, nil
+}
+
+// countRedirects walks the redirect chain the client actually followed.
+func countRedirects(resp *http.Response) int {
+	hops := 0
+	for r := resp.Request.Response; r != nil; r = r.Request.Response {
+		hops++
+		if r.Request == nil || r.Request.Response == nil || hops > 10 {
+			break
+		}
+	}
+	return hops
+}
+
+func titleOf(html string) string {
+	lower := strings.ToLower(html)
+	open := strings.Index(lower, "<title")
+	if open < 0 {
+		return ""
+	}
+	closeTag := strings.Index(lower[open:], ">")
+	if closeTag < 0 {
+		return ""
+	}
+	rest := html[open+closeTag+1:]
+	end := strings.Index(strings.ToLower(rest), "</title>")
+	if end < 0 {
+		return ""
+	}
+	title := strings.Join(strings.Fields(rest[:end]), " ")
+	if len(title) > 120 {
+		title = title[:120]
+	}
+	return title
+}
+
+// domEvidence lists the light-weight "this is a chat app" markers found in the
+// HTML. The real browser driver arrives in step 4; these markers only tell the
+// operator whether a probe reached something worth driving.
+func domEvidence(html string) []string {
+	lower := strings.ToLower(html)
+	markers := []struct {
+		label  string
+		needle string
+	}{
+		{"textarea composer", "<textarea"},
+		{"contenteditable composer", "contenteditable"},
+		{"socket.io client", "socket.io"},
+		{"websocket reference", "websocket"},
+		{"chat keyword", "chat"},
+		{"message list", "messages"},
+	}
+	found := make([]string, 0, len(markers))
+	for _, marker := range markers {
+		if strings.Contains(lower, marker.needle) {
+			found = append(found, marker.label)
+		}
+	}
+	return found
 }
 
 func (a *App) rememberTest(siteID string, result TestResult) {
@@ -279,7 +417,7 @@ func (a *App) TestConnections(payload ProxySettings) (map[string][]TestResult, e
 			passed++
 		}
 	}
-	a.log.Append("system", fmt.Sprintf("connections tested: %d/%d passed", passed, len(results)), "proxy", "")
+	a.logf("system", fmt.Sprintf("connections tested: %d/%d passed", passed, len(results)), "proxy", "")
 	return map[string][]TestResult{"results": results}, nil
 }
 
@@ -310,7 +448,7 @@ func (a *App) StartRun(mode string, siteIDs []string, profile string) (map[strin
 	if profile == "" {
 		profile = "default"
 	}
-	a.log.Append("system", fmt.Sprintf("%s run started · %d site(s) · profile %s", mode, len(siteIDs), profile), "runner", "")
+	a.logf("system", fmt.Sprintf("%s run started · %d site(s) · profile %s", mode, len(siteIDs), profile), "runner", "")
 	go a.runJob(ctx, mode, siteIDs, profile)
 	return map[string]any{"ok": true, "message": "started"}, nil
 }
@@ -327,7 +465,7 @@ func (a *App) StopRun() (map[string]any, error) {
 		cancel()
 	}
 	if wasRunning {
-		a.log.Append("system", "run stopped by user", "runner", "")
+		a.logf("system", "run stopped by user", "runner", "")
 	}
 	return map[string]any{"ok": true}, nil
 }
@@ -340,26 +478,36 @@ func (a *App) runJob(ctx context.Context, mode string, siteIDs []string, profile
 		a.mu.Lock()
 		a.running, a.runMode = false, ""
 		a.mu.Unlock()
-		a.log.Append("system", "run finished", "runner", "")
+		a.logf("system", "run finished", "runner", "")
 	}()
 
 	settings := a.store.Get()
-	lines := splitLines(settings.Message.Sequence)
-	if len(lines) == 0 {
-		lines = []string{"hello there"}
+	defaultLines := splitLines(settings.Message.Sequence)
+	if len(defaultLines) == 0 {
+		defaultLines = []string{"hello there"}
 	}
 
 	for _, siteID := range siteIDs {
 		site, _ := FindSite(a.sites, siteID)
 		if !site.Enabled {
-			a.log.Append("skip", fmt.Sprintf("%s is disabled in site.json", site.Name), "registry", siteID)
+			a.logf("skip", fmt.Sprintf("%s is disabled in site.json", site.Name), "registry", siteID)
 			continue
 		}
 		if !a.sleep(ctx, 700*time.Millisecond) {
 			return
 		}
-		a.log.Append("system", fmt.Sprintf("opening %s (%s · %s)", site.Name, site.Family, site.AccountMode), site.ID+"/site.json", siteID)
-		a.log.Append("system", fmt.Sprintf("onboarding: %s", fallback(site.EntryFlow, "guest entry")), "auto-onboard", siteID)
+		a.logf("system", fmt.Sprintf("opening %s (%s · %s)", site.Name, site.Family, site.AccountMode), site.ID+"/site.json", siteID)
+		a.logf("system", fmt.Sprintf("onboarding: %s", fallback(site.EntryFlow, "guest entry")), "auto-onboard", siteID)
+
+		lines := defaultLines
+		if settings.Message.Strategy == "folder" {
+			if fromFile := a.sequenceForSite(siteID); len(fromFile) > 0 {
+				lines = fromFile
+				a.logf("system", fmt.Sprintf("folder strategy: %d line(s) from data/sequences", len(fromFile)), "sequences", siteID)
+			} else {
+				a.logf("skip", "folder strategy but data/sequences is empty · using inline sequence", "sequences", siteID)
+			}
+		}
 
 		if !a.sleep(ctx, a.pace(settings, mode)) {
 			return
@@ -368,18 +516,18 @@ func (a *App) runJob(ctx context.Context, mode string, siteIDs []string, profile
 			if i >= settings.Message.MaxLines {
 				break
 			}
-			a.log.Append("out", line, fmt.Sprintf("line %d/%d · %s", i+1, len(lines), settings.Message.Strategy), siteID)
+			a.logf("out", line, fmt.Sprintf("line %d/%d · %s", i+1, len(lines), settings.Message.Strategy), siteID)
 			if !a.sleep(ctx, a.pace(settings, mode)) {
 				return
 			}
 			if i == 0 {
-				a.log.Append("in", "hey, how's it going?", "partner reply", siteID)
+				a.logf("in", "hey, how's it going?", "partner reply", siteID)
 			}
 		}
 		a.mu.Lock()
 		a.stats.Completed++
 		a.mu.Unlock()
-		a.log.Append("skip", "closing chat and rotating", "next target", siteID)
+		a.logf("skip", "closing chat and rotating", "next target", siteID)
 	}
 }
 
@@ -426,8 +574,8 @@ func (a *App) LaunchLogin(siteID, profile string) (map[string]any, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("prepare profile dir: %w", err)
 	}
-	a.log.Append("system", fmt.Sprintf("login window requested for %s (profile %s)", site.Name, profile), "browser", siteID)
-	a.log.Append("skip", "browser driver is wired in step 4 — no window opened yet", "scaffold", siteID)
+	a.logf("system", fmt.Sprintf("login window requested for %s (profile %s)", site.Name, profile), "browser", siteID)
+	a.logf("skip", "browser driver is wired in step 4 — no window opened yet", "scaffold", siteID)
 	return map[string]any{"ok": true, "message": "login queued", "profile_dir": dir}, nil
 }
 
@@ -474,7 +622,7 @@ func (a *App) AutoRegisterAccounts(siteID string, count int) ([]Account, error) 
 			return created, fmt.Errorf("write account: %w", err)
 		}
 		created = append(created, account)
-		a.log.Append("out", fmt.Sprintf("registered %s (%s, %d)", account.Nickname, account.Gender, account.Age), "auto-register", siteID)
+		a.logf("out", fmt.Sprintf("registered %s (%s, %d)", account.Nickname, account.Gender, account.Age), "auto-register", siteID)
 	}
 	return created, nil
 }
@@ -494,26 +642,48 @@ func (a *App) SiteDriver(siteID string) (map[string]string, error) {
 	}, nil
 }
 
-// LoadFolder lists .txt sequences from data/sequences/.
+// LoadFolder scans data/sequences/ and returns every script with its lines.
+// The folder strategy picks one of these files per site (round-robin).
 func (a *App) LoadFolder() (map[string]any, error) {
 	dir := filepath.Join(a.dataDir, "sequences")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("create sequences dir: %w", err)
 	}
-	entries, err := os.ReadDir(dir)
+	sequences, err := ReadSequences(a.dataDir)
 	if err != nil {
 		return nil, err
 	}
-	names := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(strings.ToLower(entry.Name()), ".txt") {
-			continue
-		}
-		names = append(names, entry.Name())
+	names := make([]string, 0, len(sequences))
+	total := 0
+	for _, seq := range sequences {
+		names = append(names, seq.Name)
+		total += len(seq.Lines)
 	}
-	sort.Strings(names)
-	a.log.Append("system", fmt.Sprintf("folder loaded: %d sequence file(s)", len(names)), "sequences", "")
-	return map[string]any{"count": len(names), "names": names}, nil
+	a.logf("system", fmt.Sprintf("folder loaded: %d sequence file(s) · %d line(s)", len(names), total), "sequences", "")
+	return map[string]any{
+		"count":     len(names),
+		"names":     names,
+		"sequences": sequences,
+		"total":     total,
+		"dir":       dir,
+	}, nil
+}
+
+// sequenceForSite gives the folder strategy a deterministic script per site so
+// two workers never send the same lines to the same target.
+func (a *App) sequenceForSite(siteID string) []string {
+	sequences, err := ReadSequences(a.dataDir)
+	if err != nil || len(sequences) == 0 {
+		return nil
+	}
+	index := 0
+	for i, site := range a.sites {
+		if site.ID == siteID {
+			index = i
+			break
+		}
+	}
+	return sequences[index%len(sequences)].Lines
 }
 
 // OpenDataFolder returns the absolute data path (the desktop build opens Explorer).
@@ -522,7 +692,7 @@ func (a *App) OpenDataFolder() (string, error) {
 	if err != nil {
 		return a.dataDir, nil
 	}
-	a.log.Append("system", "data folder: "+abs, "storage", "")
+	a.logf("system", "data folder: "+abs, "storage", "")
 	return abs, nil
 }
 
