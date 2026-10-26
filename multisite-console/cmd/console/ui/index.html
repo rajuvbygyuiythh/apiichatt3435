@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="forest">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multi-Site Console</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="shell visible">
+    <!-- ================= SIDEBAR ================= -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark" id="brand-mark">MS</div>
+        <div>
+          <div class="brand-title" id="brand-title">Multi-Site Console</div>
+          <div class="brand-subtitle" id="brand-subtitle">5-site engine · Go + WebView</div>
+        </div>
+      </div>
+
+      <nav class="nav" aria-label="Main modes">
+        <button class="nav-button active" data-tab="show">Show Mode</button>
+        <button class="nav-button" data-tab="worker">Worker</button>
+      </nav>
+
+      <nav class="subnav" id="subnav-show" aria-label="Show Mode sections">
+        <button class="subnav-button active" data-subpanel="show-site">Site</button>
+        <button class="subnav-button" data-subpanel="show-setting">Setting</button>
+        <button class="subnav-button" data-subpanel="show-message">Message</button>
+        <button class="subnav-button" data-subpanel="show-run">Run</button>
+        <button class="subnav-button" data-subpanel="show-logs">Live Logs</button>
+      </nav>
+
+      <nav class="subnav" id="subnav-worker" aria-label="Worker sections" hidden>
+        <button class="subnav-button active" data-subpanel="worker-sites">Sites</button>
+        <button class="subnav-button" data-subpanel="worker-accounts">Accounts</button>
+        <button class="subnav-button" data-subpanel="worker-message">Message</button>
+        <button class="subnav-button" data-subpanel="worker-settings">Settings</button>
+        <button class="subnav-button" data-subpanel="worker-logs">Live Logs</button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="status-row">
+          <span class="status-label">Workers</span>
+          <span id="running-pill" class="pill stopped">Stopped</span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">Backend</span>
+          <span id="backend-pill" class="pill stopped">…</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <!-- ======================= MODE A · SHOW MODE ======================= -->
+      <section class="tab-panel active" data-panel="show">
+        <header class="panel-header">
+          <div>
+            <div class="title-row">
+              <h1>Show Mode</h1>
+              <span id="show-run-badge" class="mode-badge">Idle</span>
+            </div>
+            <p>One visible browser, one site at a time. Configure, press Run, log in if asked, watch the live log.</p>
+          </div>
+          <div class="actions">
+            <label class="theme-picker">
+              Theme
+              <select id="theme-select" aria-label="Theme">
+                <option value="forest">Forest</option>
+                <option value="ocean">Ocean</option>
+                <option value="light">Light</option>
+              </select>
+            </label>
+            <button id="show-refresh" class="secondary-button" type="button">Refresh</button>
+          </div>
+        </header>
+
+        <div class="demo-banner" id="demo-banner" hidden>
+          <span><strong>Demo backend active.</strong> The dashboard is running on in-memory mock data — no Go or HTTP backend connected.</span>
+          <button id="demo-hide" type="button">Hide</button>
+        </div>
+
+        <div class="home-stats" aria-label="Console status">
+          <div class="stat-capsule"><span>Sites</span><strong id="stat-sites">0</strong></div>
+          <div class="stat-capsule"><span>Enabled</span><strong id="stat-enabled">0</strong></div>
+          <div class="stat-capsule"><span>Accounts</span><strong id="stat-accounts">0</strong></div>
+          <div class="stat-capsule"><span>Sessions</span><strong id="stat-sessions">0</strong></div>
+          <div class="stat-capsule"><span>Running</span><strong id="stat-running">0</strong></div>
+          <div class="stat-capsule danger"><span>Failures</span><strong id="stat-failures">0</strong></div>
+        </div>
+
+        <!-- 1 · SITE -->
+        <section class="subpanel active" data-subpanel="show-site">
+          <div class="subpage">
+            <section class="card">
+              <div class="step-head"><span class="step-num">1</span><h2>Site</h2></div>
+              <p class="hint-text">Every site is an isolated folder (<code>sites/&lt;id&gt;/site.json</code> + <code>dom_driver.js</code>). Pick the one this visible browser should open.</p>
+
+              <div class="site-picker" id="site-picker" role="radiogroup" aria-label="Select site">
+                <!-- rendered by app.js from the snapshot -->
+              </div>
+
+              <dl class="kv-block" id="site-facts">
+                <dt>Start URL</dt><dd id="site-fact-url">—</dd>
+                <dt>Family</dt><dd id="site-fact-family">—</dd>
+                <dt>Account mode</dt><dd id="site-fact-account-mode">—</dd>
+                <dt>Entry flow</dt><dd id="site-fact-entry-flow">—</dd>
+                <dt>Protection</dt><dd id="site-fact-protection">—</dd>
+              </dl>
+
+              <div class="form-actions inline">
+                <button id="site-test" class="secondary-button" type="button">Test Site</button>
+                <button id="site-driver-load" class="secondary-button" type="button">View DOM Driver</button>
+                <span id="site-test-status" class="status-line" role="status" aria-live="polite">Not tested.</span>
+              </div>
+              <pre id="site-driver-code" class="code-block" hidden></pre>
+            </section>
+          </div>
+        </section>
+
+        <!-- 2 · SETTING -->
+        <section class="subpanel" data-subpanel="show-setting">
+          <div class="subpage narrow">
+            <section class="card">
+              <div class="step-head"><span class="step-num">2</span><h2>Setting</h2></div>
+              <p class="hint-text">Run applies these values. First-message policy decides who talks first after onboarding.</p>
+
+              <div class="form-grid two-column">
+                <label>
+                  <span>First-message policy</span>
+                  <select id="sf-mode">
+                    <option value="bot">Bot first</option>
+                    <option value="user">User first</option>
+                    <option value="random">Random</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Bot first chance (%)</span>
+                  <input type="number" id="sf-chance" min="0" max="100" step="1" value="70">
+                </label>
+                <label>
+                  <span>Wait for first message</span>
+                  <select id="sf-wait">
+                    <option value="unlimited">Wait indefinitely</option>
+                    <option value="skip">Skip after timeout</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Profile</span>
+                  <input type="text" id="sf-profile" placeholder="default" autocomplete="off">
+                </label>
+                <label><span>First timeout min (s)</span><input type="number" id="sf-timeout-min" min="1" max="86400" step="1" value="30"></label>
+                <label><span>First timeout max (s)</span><input type="number" id="sf-timeout-max" min="1" max="86400" step="1" value="60"></label>
+                <label><span>Reply delay min (s)</span><input type="number" id="sf-reply-min" min="1" max="86400" step="1" value="4"></label>
+                <label><span>Reply delay max (s)</span><input type="number" id="sf-reply-max" min="1" max="86400" step="1" value="9"></label>
+                <label><span>No-reply timeout min (s)</span><input type="number" id="sf-noreply-min" min="0" max="86400" step="1" value="60"></label>
+                <label><span>No-reply timeout max (s)</span><input type="number" id="sf-noreply-max" min="0" max="86400" step="1" value="90"></label>
+              </div>
+
+              <label class="checkbox-row">
+                <input type="checkbox" id="sf-autoskip">
+                <span>Auto-skip when the partner stops replying</span>
+              </label>
+
+              <div class="form-actions inline">
+                <button id="sf-save" class="primary-button" type="button">Save Setting</button>
+                <span id="sf-status" class="status-line" role="status" aria-live="polite"></span>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <!-- 3 · MESSAGE -->
+        <section class="subpanel" data-subpanel="show-message">
+          <div class="subpage">
+            <section class="card">
+              <div class="step-head"><span class="step-num">3</span><h2>Message</h2></div>
+              <p class="hint-text">Shared by both modes — one store, so you configure the conversation once.</p>
+
+              <div class="chat-mode-card">
+                <span class="mode-label">Strategy</span>
+                <div class="mode-options">
+                  <label class="mode-option" id="msg-option-single">
+                    <input type="radio" name="msg-strategy" value="single" id="msg-strategy-single" checked>
+                    <span>Single sequence</span>
+                  </label>
+                  <label class="mode-option" id="msg-option-folder">
+                    <input type="radio" name="msg-strategy" value="folder" id="msg-strategy-folder">
+                    <span>Folder of sequences</span>
+                  </label>
+                  <label class="mode-option" id="msg-option-model">
+                    <input type="radio" name="msg-strategy" value="model" id="msg-strategy-model">
+                    <span>Model-written</span>
+                  </label>
+                </div>
+              </div>
+
+              <div id="msg-section-single">
+                <label>
+                  <span>Sequence (one line = one step)</span>
+                  <textarea id="msg-sequence" rows="7" placeholder="hey there&#10;what's up?"></textarea>
+                </label>
+                <p class="hint-text">Max lines caps how many of these the runner sends per chat.</p>
+              </div>
+
+              <div id="msg-section-folder" style="display: none;">
+                <div class="form-actions inline">
+                  <button id="msg-load-folder" class="secondary-button" type="button">Load Folder</button>
+                  <span id="msg-folder-status" class="status-line">0 sequences loaded</span>
+                </div>
+                <p class="hint-text">Reads <code>data/sequences/*.txt</code> — one file per conversation script.</p>
+              </div>
+
+              <div id="msg-section-model" style="display: none;">
+                <p class="hint-text">Model mode uses the shared API credentials from the desktop settings file. The model call is wired in step 4 of the build plan.</p>
+              </div>
+
+              <div class="form-grid two-column">
+                <label>
+                  <span>Max lines per chat</span>
+                  <input type="number" id="msg-max-lines" min="1" max="20" step="1" value="3">
+                </label>
+                <label>
+                  <span>Targets / handles (one per line)</span>
+                  <textarea id="msg-targets" rows="3" placeholder="(optional) handles or room ids"></textarea>
+                </label>
+              </div>
+
+              <div class="form-actions inline">
+                <button id="msg-save" class="primary-button" type="button">Save Message</button>
+                <span id="msg-status" class="status-line" role="status" aria-live="polite"></span>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <!-- 4 · RUN -->
+        <section class="subpanel" data-subpanel="show-run">
+          <div class="subpage narrow">
+            <section class="card run-card">
+              <div class="step-head"><span class="step-num">4</span><h2>Run</h2></div>
+
+              <div class="profile-choice" role="radiogroup" aria-label="Select profile">
+                <span class="mode-label">Session</span>
+                <div class="mode-options">
+                  <label class="mode-option" id="run-profile-option-default">
+                    <input type="radio" name="run-profile" value="default" id="run-profile-default" checked>
+                    <span>fresh login</span>
+                  </label>
+                  <label class="mode-option" id="run-profile-option-saved">
+                    <input type="radio" name="run-profile" value="session" id="run-profile-saved">
+                    <span>saved session</span>
+                  </label>
+                </div>
+              </div>
+
+              <p id="run-site-summary" class="hint-text">Select a site in step 1.</p>
+
+              <button id="run-start" class="primary-button run-button" type="button">&#9654; Run Browser</button>
+              <p id="run-status" class="status-line" role="status" aria-live="polite">Idle.</p>
+              <p class="hint-text">Run saves Setting + Message, then opens the site in a visible browser. Onboarding, replies and skip are logged live.</p>
+            </section>
+          </div>
+        </section>
+
+        <!-- 5 · LIVE LOGS -->
+        <section class="subpanel" data-subpanel="show-logs">
+          <div class="subpage">
+            <section class="card log-card">
+              <div class="log-header">
+                <div class="step-head" style="margin: 0;"><span class="step-num">5</span><h2>Live Logs</h2></div>
+                <div class="log-tools">
+                  <select id="show-log-filter" aria-label="Filter show logs">
+                    <option value="all">All</option>
+                    <option value="io">IN / OUT</option>
+                    <option value="rules">Rules</option>
+                    <option value="errors">Errors</option>
+                  </select>
+                  <button id="show-log-clear" class="secondary-button" type="button">Clear</button>
+                </div>
+              </div>
+              <div id="show-log-list" class="log-list" aria-live="polite"></div>
+              <p id="show-log-empty" class="hint-text">No activity yet. Press Run.</p>
+            </section>
+          </div>
+        </section>
+      </section>
+
+      <!-- ========================= MODE B · WORKER ========================= -->
+      <section class="tab-panel" data-panel="worker">
+        <header class="panel-header">
+          <div>
+            <div class="title-row">
+              <h1>Worker</h1>
+              <span id="worker-badge" class="mode-badge">API worker</span>
+            </div>
+            <p>Headless workers across several sites. Each site keeps its own accounts and sessions.</p>
+            <p id="worker-summary" class="hint-text"></p>
+          </div>
+          <div class="actions">
+            <button id="worker-start" class="primary-button" type="button">Save &amp; Start</button>
+            <button id="worker-stop" class="secondary-button" type="button" disabled>Stop</button>
+            <button id="worker-refresh" class="secondary-button" type="button">Refresh</button>
+          </div>
+        </header>
+
+        <p id="worker-status" class="status-line" role="status" aria-live="polite">Idle.</p>
+
+        <!-- 1 · SITES -->
+        <section class="subpanel active" data-subpanel="worker-sites">
+          <div class="subpage">
+            <section class="card">
+              <div class="step-head"><span class="step-num">1</span><h2>Sites</h2></div>
+              <p class="hint-text">Tick the sites this worker may use. Everything else here stays untouched, so a broken site can never block the rest.</p>
+
+              <div class="site-check-list" id="site-check-list">
+                <!-- rendered by app.js -->
+              </div>
+
+              <div class="form-actions inline">
+                <button id="wsel-save" class="primary-button" type="button">Save Selection</button>
+                <span id="wsel-count" class="mini-stat">0 sites selected</span>
+                <span id="wsel-status" class="status-line" role="status" aria-live="polite"></span>
+              </div>
+            </section>
+
+            <section class="card" style="margin-top: 16px;">
+              <h2>Site state</h2>
+              <p class="hint-text">Accounts and sessions are counted from <code>sites/&lt;id&gt;/accounts</code> and <code>sites/&lt;id&gt;/profiles</code>.</p>
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr><th>Site</th><th>Family</th><th>Mode</th><th>Accounts</th><th>Session</th><th>Driver</th><th>Status</th></tr>
+                  </thead>
+                  <tbody id="sites-table-body">
+                    <tr><td colspan="7">No sites loaded.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <!-- 2 · ACCOUNTS -->
+        <section class="subpanel" data-subpanel="worker-accounts">
+          <div class="subpage">
+            <div class="card-grid">
+              <section class="card">
+                <div class="step-head"><span class="step-num">2</span><h2>Auto-register</h2></div>
+                <p class="hint-text">Creates guest identities inside the site's own <code>accounts/</code> folder. No browser is opened.</p>
+
+                <label>
+                  <span>Site</span>
+                  <select id="acc-site"></select>
+                </label>
+                <div class="form-grid two-column">
+                  <label><span>How many</span><input type="number" id="acc-count" min="1" max="20" step="1" value="2"></label>
+                  <label>
+                    <span>Gender</span>
+                    <select id="acc-gender">
+                      <option value="female">Female</option>
+                      <option value="male">Male</option>
+                      <option value="random">Random</option>
+                    </select>
+                  </label>
+                  <label><span>Age</span><input type="number" id="acc-age" min="18" max="99" step="1" value="21"></label>
+                  <label><span>Nickname pool (comma separated)</span><input type="text" id="acc-pool" placeholder="Sophia,Emma,Olivia" autocomplete="off"></label>
+                </div>
+
+                <div class="form-actions inline">
+                  <button id="acc-register" class="primary-button" type="button">Auto-register</button>
+                  <span id="acc-status" class="status-line" role="status" aria-live="polite"></span>
+                </div>
+              </section>
+
+              <section class="card">
+                <div class="step-head"><span class="step-num">+</span><h2>Manual login</h2></div>
+                <p class="hint-text">For sites whose guest flow needs a real click-through. Opens a browser with this site's own profile folder.</p>
+                <label>
+                  <span>Profile</span>
+                  <input type="text" id="acc-profile" placeholder="default" autocomplete="off">
+                </label>
+                <div class="form-actions inline">
+                  <button id="acc-login" class="secondary-button" type="button">Launch for Login</button>
+                  <span id="acc-login-status" class="status-line" role="status" aria-live="polite">No browser launched.</span>
+                </div>
+                <p class="hint-text">The browser driver is connected in build step 4 — until then this only prepares the profile folder.</p>
+              </section>
+            </div>
+
+            <section class="card" style="margin-top: 16px;">
+              <h2>Accounts created in this session</h2>
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr><th>#</th><th>Nickname</th><th>Site</th><th>Gender</th><th>Age</th><th>Status</th></tr>
+                  </thead>
+                  <tbody id="acc-table-body">
+                    <tr><td colspan="6">Nothing registered yet.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <!-- 3 · MESSAGE (worker copy, same store) -->
+        <section class="subpanel" data-subpanel="worker-message">
+          <div class="subpage narrow">
+            <section class="card">
+              <div class="step-head"><span class="step-num">3</span><h2>Message</h2></div>
+              <p class="hint-text">Same settings as Show Mode · Message. Editing here updates the shared store.</p>
+
+              <div class="chat-mode-card">
+                <span class="mode-label">Strategy</span>
+                <div class="mode-options">
+                  <label class="mode-option" id="wmsg-option-single">
+                    <input type="radio" name="wmsg-strategy" value="single" id="wmsg-strategy-single" checked>
+                    <span>Single sequence</span>
+                  </label>
+                  <label class="mode-option" id="wmsg-option-folder">
+                    <input type="radio" name="wmsg-strategy" value="folder" id="wmsg-strategy-folder">
+                    <span>Folder sequences</span>
+                  </label>
+                  <label class="mode-option" id="wmsg-option-model">
+                    <input type="radio" name="wmsg-strategy" value="model" id="wmsg-strategy-model">
+                    <span>Model-written</span>
+                  </label>
+                </div>
+              </div>
+
+              <label>
+                <span>Sequence (one line = one step)</span>
+                <textarea id="wmsg-sequence" rows="7" placeholder="hey there&#10;what's up?"></textarea>
+              </label>
+              <div class="form-grid two-column">
+                <label><span>Max lines per chat</span><input type="number" id="wmsg-max-lines" min="1" max="20" step="1" value="3"></label>
+                <label><span>Targets (one per line)</span><textarea id="wmsg-targets" rows="3" placeholder="(optional)"></textarea></label>
+              </div>
+
+              <div class="form-actions inline">
+                <button id="wmsg-save" class="primary-button" type="button">Save Message</button>
+                <span id="wmsg-status" class="status-line" role="status" aria-live="polite"></span>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <!-- 4 · SETTINGS -->
+        <section class="subpanel" data-subpanel="worker-settings">
+          <div class="subpage">
+            <section class="card">
+              <div class="step-head"><span class="step-num">4</span><h2>Settings</h2></div>
+              <p class="hint-text">Randomised pacing pairs. Min ≦ max is enforced by the backend on save.</p>
+
+              <div class="form-grid two-column">
+                <label><span>Poll min (s)</span><input type="number" id="wk-poll-min" min="1" max="86400" step="1" value="5"></label>
+                <label><span>Poll max (s)</span><input type="number" id="wk-poll-max" min="1" max="86400" step="1" value="12"></label>
+                <label><span>Action min (s)</span><input type="number" id="wk-action-min" min="1" max="86400" step="1" value="3"></label>
+                <label><span>Action max (s)</span><input type="number" id="wk-action-max" min="1" max="86400" step="1" value="8"></label>
+                <label><span>Timeout min (s)</span><input type="number" id="wk-timeout-min" min="1" max="86400" step="1" value="60"></label>
+                <label><span>Timeout max (s)</span><input type="number" id="wk-timeout-max" min="1" max="86400" step="1" value="90"></label>
+                <label><span>Retry min (s)</span><input type="number" id="wk-retry-min" min="0" max="86400" step="1" value="10"></label>
+                <label><span>Retry max (s)</span><input type="number" id="wk-retry-max" min="0" max="86400" step="1" value="30"></label>
+                <label><span>Concurrency (workers)</span><input type="number" id="wk-concurrency" min="1" max="20" step="1" value="1"></label>
+                <label><span>Profile</span><input type="text" id="wk-profile" placeholder="default" autocomplete="off"></label>
+              </div>
+
+              <label class="checkbox-row">
+                <input type="checkbox" id="wk-headless">
+                <span>Headless workers (no visible window)</span>
+              </label>
+
+              <div class="form-actions inline">
+                <button id="wk-save" class="primary-button" type="button">Save Settings</button>
+                <span id="wk-status" class="status-line" role="status" aria-live="polite"></span>
+              </div>
+            </section>
+
+            <section class="card" style="margin-top: 16px;">
+              <h2>Proxy</h2>
+              <p class="hint-text">Shared by both modes. One line per proxy; Test dials each entry.</p>
+              <label class="checkbox-row">
+                <input type="checkbox" id="wk-proxy-enabled">
+                <span>Use proxy</span>
+              </label>
+              <div class="form-grid two-column">
+                <label>
+                  <span>Default protocol</span>
+                  <select id="wk-proxy-scheme">
+                    <option value="http">HTTP</option>
+                    <option value="socks5">SOCKS5</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Entries (one per line)</span>
+                  <textarea id="wk-proxy-entries" rows="4" placeholder="host:port&#10;host:port:user:pass"></textarea>
+                </label>
+              </div>
+              <div class="form-actions inline">
+                <button id="wk-proxy-save" class="secondary-button" type="button">Save Proxy</button>
+                <button id="wk-proxy-test" class="secondary-button" type="button">Test Proxy</button>
+                <span id="wk-proxy-status" class="status-line" role="status" aria-live="polite">Not tested.</span>
+              </div>
+              <div id="wk-proxy-results" class="proxy-results"></div>
+            </section>
+          </div>
+        </section>
+
+        <!-- 5 · LIVE LOGS -->
+        <section class="subpanel" data-subpanel="worker-logs">
+          <div class="subpage">
+            <section class="card log-card">
+              <div class="log-header">
+                <div class="step-head" style="margin: 0;"><span class="step-num">5</span><h2>Live Logs</h2></div>
+                <div class="log-tools">
+                  <select id="worker-log-filter" aria-label="Filter worker logs">
+                    <option value="all">All</option>
+                    <option value="io">IN / OUT</option>
+                    <option value="rules">Rules</option>
+                    <option value="errors">Errors</option>
+                  </select>
+                  <button id="worker-log-clear" class="secondary-button" type="button">Clear</button>
+                </div>
+              </div>
+              <div id="worker-log-list" class="log-list" aria-live="polite"></div>
+              <p id="worker-log-empty" class="hint-text">No activity yet. Press Save &amp; Start.</p>
+            </section>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast-wrap" id="toast-wrap" aria-live="polite"></div>
+
+  <!-- mock backend: harmless when a real backend exists (the bridge probes first) -->
+  <script src="./js/mock-backend.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "multisite-console-verification",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Browser-free UI verification for the Multi-Site Console (not a frontend build step)",
+  "scripts": {
+    "test:ui:mock": "node tests/ui-mock.mjs",
+    "test:ui:http": "node tests/ui-real.mjs",
+    "verify": "go vet ./... && go test ./... && node --check cmd/console/ui/app.js && node --check cmd/console/ui/js/mock-backend.js"
+  },
+  "devDependencies": {
+    "jsdom": "26.1.0"
+  }
+}

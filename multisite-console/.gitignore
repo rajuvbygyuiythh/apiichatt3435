@@ -1,0 +1,17 @@
+# runtime state — never commit
+data/
+build/
+dist/
+node_modules/
+*.exe
+*.log
+
+# per-site runtime folders (accounts, sessions, captures)
+sites/*/accounts/
+sites/*/profiles/
+sites/*/sessions/
+sites/*/logs/
+
+# local test artefacts
+/tmp/
+settings.json.corrupt
