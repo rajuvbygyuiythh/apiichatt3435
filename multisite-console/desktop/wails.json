@@ -1,0 +1,20 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "Multi-Site Console",
+  "outputfilename": "Multi-Site-Console",
+  "frontend:install": "",
+  "frontend:build": "",
+  "frontend:dev:watcher": "",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "Multi-Site Console",
+    "email": "console@example.invalid"
+  },
+  "info": {
+    "companyName": "Multi-Site Console",
+    "productName": "Multi-Site Console",
+    "productVersion": "1.0.0",
+    "copyright": "",
+    "comments": "Go + WebView multi-site console"
+  }
+}

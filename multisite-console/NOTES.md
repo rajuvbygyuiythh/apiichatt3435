@@ -184,3 +184,17 @@ all sites), `GetSessions({site_id})`, `SaveSession({site_id,profile,values})`,
 Why a fake-Chrome test instead of "trust me": the protocol surface (framing, ids, evaluate envelope,
 navigation, insertText, screenshot) is exactly where a hand-rolled client breaks. A scripted Chrome
 over a real socket exercises all of it in CI, including the full run cycle, with no browser installed.
+
+---
+
+## 11 · Step 5 — desktop shell, polish, packaging (frozen with this step)
+
+| Piece | Decision |
+|---|---|
+| **Separate desktop module** | `desktop/go.mod` requires `wails/v2` and `replace multisiteconsole => ../`. The root module stays stdlib-only, so `go build ./...` / `go test ./...` never need Wails or the module proxy — the tests you saw at every step keep running on a bare machine |
+| **Assets** | `desktop/frontend/dist` is a synced copy of `cmd/console/ui` (embedded with `//go:embed all:frontend/dist`). One source of truth for the dashboard, one 1-second sync step (`scripts/sync-ui.*`) before a desktop build |
+| **Binding surface** | a thin `api` wrapper, **19 methods, one argument struct each**, because `app.js` always calls `bridge.invoke(name, payload)`. Method names match the HTTP routes exactly, so the same dashboard works in the window and in the browser |
+| **Where the desktop writes** | `%APPDATA%\MultiSiteConsole\data` (settings, logs, sequences, screenshots) and `...\sites` (profiles/accounts) with `MULTISITE_HOME` / `MULTISITE_SITES` overrides — never next to Program Files |
+| **Windows UX** | `install.bat` (Go check, modules, Wails CLI), `run-web.bat` (zero-dependency start), `build-desktop.bat` (sync → tidy → `wails build` → copy `sites/` beside the exe) |
+| **Polish** | sidebar now carries a Browser pill (ready/none with the detected binary in the tooltip), a version badge, the data folder path and a **Data folder** button wired to `OpenDataFolder` |
+| **Honesty** | the desktop binary is built on the user's machine; this sandbox cannot fetch the Wails module. That is stated in TEST-REPORT §6 rather than glossed over |

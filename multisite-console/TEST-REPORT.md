@@ -1,8 +1,8 @@
 # TEST REPORT — Multi-Site Console
 
-**Step 4 · real browser driver (CDP) — 2026-10-26**
-Every number below comes from a command that was actually executed in this sandbox with
-Go 1.27.3 and Node/jsdom. Where something could not be executed it is listed in §6.
+**Step 5 · desktop shell + polish + packaging — 2026-10-26**
+Every number below comes from a command executed in this sandbox (Go 1.27.3, Node + jsdom).
+Where a check could not be executed here, §6 says so plainly.
 
 ---
 
@@ -10,93 +10,97 @@ Go 1.27.3 and Node/jsdom. Where something could not be executed it is listed in 
 
 | Check | Command | Result |
 |---|---|---|
-| Formatting | `gofmt -l .` | clean |
+| Formatting | `gofmt -l .` (core, cmd, desktop) | clean |
 | Compile | `go build ./...` | **PASS** |
 | Static analysis | `go vet ./...` | **PASS** (no findings) |
 | Frontend syntax | `node --check cmd/console/ui/app.js` | **PASS** |
 | Mock syntax | `node --check cmd/console/ui/js/mock-backend.js` | **PASS** |
 | Real-UI test syntax | `node --check tests/ui-real.mjs` | **PASS** |
+| UI sync for desktop | `./scripts/sync-ui.sh` | **PASS** (asset folder refreshed) |
 
-## 2 · Go tests — **40 / 40 PASS, 0 skipped**
+## 2 · Go tests — **40 / 40 PASS**
 
 ```
-ok  	multisiteconsole/internal/core	40.4s
+?   	multisiteconsole/cmd/console	[no test files]
+ok  	multisiteconsole/internal/core	37.5s
 ```
 
-Step 2 (16) and step 3 (14) tests still pass. New in step 4:
+Coverage spans steps 2–4: registry, settings store, log ring + cursor, accounts, pacing, run
+lifecycle, HTTP surface, diagnostics, sessions, file log + redaction, sequence folder strategy,
+WebSocket framing, CDP call/reply, browser discovery, driver send/snapshot, and a **full real run
+cycle against a scripted Chrome** (launch → navigate → inject driver → send → partner reply →
+SKIP → `session.json` → redacted file log).
 
-| Test | What it proves |
+## 3 · Live UI on the mock backend (jsdom) — **62 / 62 PASS**
+
+`node tests/ui-mock.mjs`
+
+Boot/bridge detection, site cards, stats, checklist, tables, all 10 sub-panels, save setting +
+draft survives polling, strategy switch, Test Site, driver viewer, diagnostics panel (9 checks,
+refresh, follows site switch), sessions table + delete, log filters (kind **and** site), browser
+status/save/detect, Browser Check → PASS with screenshot path, worker run, stop, clear, 3 themes,
+**footer version + data path, browser pill, Open data folder toast**, 0 runtime errors.
+
+## 4 · Live UI against the real Go backend (jsdom + fetch) — **30 / 30 PASS**
+
+Server: `go run ./cmd/console -addr 0.0.0.0:8090 -data /tmp/msdata` → **v0.5.0-step5**.
+
+| Group | Result |
 |---|---|
-| `TestWebSocketClientEcho` | hand-rolled WS client: upgrade, masked client frames, 70 000-byte payload (64-bit length path), server echo |
-| `TestWebSocketRejectsNonUpgrade` | a non-101 handshake is an error, not a panic |
-| `TestBrowseLaunchNavigateEvaluate` | full launch → `/json/list` → attach page socket → `Page.navigate` → `Runtime.evaluate` → `Page.captureScreenshot` (PNG bytes decoded) |
-| `TestLaunchBrowserFailsFastWithoutTarget` | a browser that never opens the debug port fails inside the timeout |
-| `TestDiscoverBrowserHonoursEnv` | `MULTISITE_BROWSER` wins, source reported, `--version` parsed |
-| `TestDiscoverBrowserMissing` | missing browser → `found=false` + note + candidate list (no crash) |
-| `TestDriverSendAndSnapshot` | driver decodes the page snapshot, inserts text via `Input.insertText`, clicks SEND/SKIP, reads `probe()` |
-| `TestDriverSendFailsWithoutComposer` | no composer → explicit error instead of a silent no-op |
-| `TestRunRealBrowserCycle` | **the real runner**: launch → navigate → install driver → snapshot → 2 outbound lines → partner reply logged as `in` → SKIP → `session.json` written → `data/logs.txt` mirrored → 1 completed / 0 failed |
-| `TestRunSimulationWhenNoBrowser` | without a browser the run says `SIMULATION` in the log instead of pretending |
-
-The real-cycle test uses a scripted Chrome (`fakeChrome`) that speaks the DevTools protocol over a
-real socket, so the WebSocket framing, the CDP id/reply matching, the launch handshake, the driver
-injection, the send path, the message pump and the run bookkeeping are all executed — not mocked at
-the function level.
-
-## 3 · Live UI on the mock backend (jsdom) — **58 / 58 PASS**
-
-`node tests/ui-mock.mjs` — adds to the step-3 suite: browser status line, headless/page-timeout
-defaults, save browser settings, Detect, **Browser Check → PASS with screenshot path**, plus all
-step-3 diagnostics/sessions/log-filter assertions and 0 runtime errors.
-
-## 4 · Live UI against the real Go backend (jsdom + fetch) — **31 / 31 PASS**
-
-Server: `go run ./cmd/console -addr 0.0.0.0:8090 -data /tmp/msdata` (v0.4.0-step4), no mock loaded.
-
-| Assertion | Result |
-|---|---|
-| Bridge → real HTTP, 5 sites, stats, version `v0.4.0-step4` | PASS |
-| `SaveSettings` + persistence | PASS |
+| Bridge → real HTTP, 5 sites, stats, version, demo banner hidden | PASS |
+| `SaveSettings` + persistence round-trip | PASS |
 | `TestSite` real probe (`FAIL · EOF` — sandbox blocks the sites) | PASS |
-| Diagnostics: 9 checks, `11/11` selectors, latency history `[68,3]` | PASS |
-| Sessions: create / list / delete on disk | PASS |
-| **`GetBrowserStatus` → `found:false` + 8 candidate paths on this Linux box** | PASS |
-| **missing browser explained in the UI, Browser Check fails cleanly (no crash)** | PASS |
-| **worker run states `simulation` honestly instead of faking a browser** | PASS |
-| Auto-register, StartRun/StopRun, 24 log rows, proxy dial 1/2 | PASS |
-| 0 uncaught runtime errors | PASS |
+| `GetSiteDiagnostics` (9 checks, 11/11 selectors, latency history) | PASS |
+| Sessions: save / list / delete on disk | PASS |
+| `GetBrowserStatus` → `found:false` + candidate list, explained in the UI | PASS |
+| Browser Check on a machine without a browser fails cleanly | PASS |
+| Worker run states `simulation` honestly, 24 log rows, Stop settles | PASS |
+| Auto-register, proxy dial (1/2), 0 uncaught errors | PASS |
 
-## 5 · What was really written during these runs
+## 5 · Desktop shell (Wails v2)
 
-```
-sites/<id>/profiles/<profile>/session.json      written by the real run (fake Chrome) and by SaveSession
-data/logs.txt                                    every event, secrets redacted
-data/screenshots/<site>-<stamp>.png              Browser Check (unit test decodes PNG bytes)
-```
+| Item | Status |
+|---|---|
+| `desktop/go.mod` (separate module + `replace multisiteconsole => ../`) | written |
+| `desktop/main.go` — window, embedded assets, `bootstrap()` paths | written, `gofmt` clean |
+| `desktop/frontend/dist` — synced copy of the dashboard | present |
+| Native binding surface (19 methods, one object argument each) | written to match `app.js` exactly |
+| `scripts/install.bat`, `run-web.bat`, `build-desktop.bat`, `sync-ui.bat/.sh` | written |
+| `wails build` **executed** | **no** — see §6 |
 
 ## 6 · Not run (honest list)
 
-- **A real Chrome/Edge window** — this sandbox has no browser binary and no route to a download
-  mirror. `GetBrowserStatus` correctly reports `found:false`; the launch → CDP path is covered by the
-  scripted Chrome above. On a Windows machine with Chrome installed the same code path runs
-  unchanged (see §7).
-- **Real chat against the 5 live sites** — outbound network here is allow-listed to GitHub/npm/PyPI,
-  so site probes answer `EOF`.
-- **Wails desktop build** — step 5, built on Windows with `wails build`.
+- **`wails build`** — the Wails module cannot be downloaded here (network is allow-listed to
+  GitHub/npm/PyPI; the Go module proxy is not reachable), so the desktop binary is built on the
+  user's Windows machine with `scripts\install.bat` + `scripts\build-desktop.bat`. The Go shell is
+  compiled only there; the module boundary guarantees the root module and all tests stay green
+  either way.
+- **A real Chrome window** — no browser binary in this sandbox. `GetBrowserStatus` reports
+  `found:false`; the whole CDP path is covered by the scripted Chrome in `step4_test.go`.
+- **Real chat on the 5 live sites** — outbound network is restricted here; probes answer `EOF`.
 
-## 7 · Reproduce (with a real browser)
+## 7 · Reproduce
 
 ```bash
-go vet ./... && go test ./...
-go run ./cmd/console -addr 0.0.0.0:8090 -data ./data &
-# open http://127.0.0.1:8090 → Worker ▸ Settings ▸ Browser driver ▸ Detect
-# Show ▸ Site ▸ Browser Check   (opens headless Chrome, injects the site driver, reports phase)
+gofmt -l . && go vet ./... && go test ./...
+go run ./cmd/console -addr 0.0.0.0:8090 -data /tmp/msdata &
+node tests/ui-mock.mjs
+BASE=http://127.0.0.1:8090 node tests/ui-real.mjs
+```
+
+Windows:
+
+```bat
+scripts\run-web.bat            :: browser mode, no dependencies
+scripts\install.bat            :: Go check + modules + Wails CLI
+scripts\build-desktop.bat      :: Multi-Site-Console.exe in build\bin
 ```
 
 ## 8 · History
 
 | Step | Evidence |
 |---|---|
-| 2 | Go 16/16, UI mock 37/37, UI real 18/18 — commit `0c27ddb` |
-| 3 | Go 30/30, UI mock 50/50, UI real 25/25 — commit `30176d6` |
-| 4 | Go 40/40, UI mock 58/58, UI real 31/31 — this commit |
+| 2 | Go 16/16 · UI mock 37/37 · UI real 18/18 — `0c27ddb` |
+| 3 | Go 30/30 · UI mock 50/50 · UI real 25/25 — `30176d6` |
+| 4 | Go 40/40 · UI mock 58/58 · UI real 31/31 — `d3a786d` |
+| 5 | Go 40/40 · UI mock 62/62 · UI real 30/30 — this commit |

@@ -1574,3 +1574,28 @@ kbd {
 .inline-label select { min-width: 160px; }
 
 #sess-table-body td:last-child { text-align: right; }
+
+/* ---------- step 5: sidebar footer meta ---------- */
+.footer-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.footer-meta .mini-stat {
+  flex: 1;
+  text-align: center;
+  font-family: var(--mono, ui-monospace, monospace);
+}
+
+.footer-path {
+  margin: 6px 0 0;
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--muted);
+  word-break: break-all;
+  opacity: 0.75;
+}
+
+.pill.running { border-color: var(--accent); color: var(--accent); }

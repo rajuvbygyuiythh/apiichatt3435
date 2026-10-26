@@ -157,7 +157,7 @@
         stats: { ...stats },
         runtime: {
           running, mode: runMode, kind: "mock", data_dir: "data (demo)", log_path: "data/logs.txt (demo)",
-          version: "0.2.0-scaffold", started_at: "09:00:00", sites: SITES.length,
+          version: "0.5.0-step5", started_at: "09:00:00", sites: SITES.length,
         },
       };
     },

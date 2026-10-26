@@ -191,6 +191,13 @@ for (const t of ["ocean", "light", "forest"]) {
   $("theme-select").dispatchEvent(new window.Event("change"));
   ok("theme " + t, window.document.documentElement.dataset.theme === t);
 }
+// ---------- step 5: footer + runtime info ----------
+ok("footer version", /^v\d/.test($("footer-version").textContent), $("footer-version").textContent);
+ok("footer data path", $("footer-data").textContent.length > 0, $("footer-data").textContent);
+ok("browser pill ready", $("browser-pill").textContent === "ready", $("browser-pill").textContent);
+$("open-data").click();
+await wait(300);
+ok("open data folder toast", $("toast-wrap").textContent.includes("data"), $("toast-wrap").textContent.slice(0, 60));
 ok("no runtime errors", errors.length === 0, errors.join(" | "));
 window.close();
 process.exit(0);

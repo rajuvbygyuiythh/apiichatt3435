@@ -13,6 +13,20 @@ Worker      1 Sites · 2 Accounts · 3 Message · 4 Settings · 5 Logs     (head
 > real Go backend. Browser automation and the Wails shell land in steps 4–5. See
 > `NOTES.md` §7 for the exact real-vs-simulated table.
 
+## Desktop app (Windows)
+
+```bat
+scripts\install.bat          :: checks Go, downloads modules, installs the Wails CLI
+scripts\build-desktop.bat    :: builds build\bin\Multi-Site-Console.exe
+```
+
+The desktop shell lives in `desktop/` as its own module (so the core stays dependency-free);
+details and data paths are in `desktop/README.md`. Web mode keeps working with no extra install:
+
+```bat
+scripts\run-web.bat
+```
+
 ## Run it (no toolchain beyond Go)
 
 ```bash

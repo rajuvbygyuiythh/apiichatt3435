@@ -283,6 +283,38 @@ function setBusy(which, busy) {
   renderRunning();
 }
 
+function renderRuntime(runtime) {
+  if (!runtime) return;
+  const version = byId("footer-version");
+  if (version) version.textContent = "v" + (runtime.version || "—");
+  const data = byId("footer-data");
+  if (data) data.textContent = runtime.data_dir || "—";
+}
+
+function renderBrowserPill(status) {
+  const pill = byId("browser-pill");
+  if (!pill || !status) return;
+  if (status.found) {
+    pill.textContent = "ready";
+    pill.className = "pill running";
+    pill.title = `${status.name} · ${status.path}`;
+  } else {
+    pill.textContent = "none";
+    pill.className = "pill stopped";
+    pill.title = status.note || "no browser";
+  }
+}
+
+async function openDataFolder() {
+  try {
+    const out = await bridge.invoke("OpenDataFolder");
+    toast(`Data folder: ${out.path || "unknown"}`, "ok");
+    setStatus("wk-browser-status", `data: ${out.path || ""}`);
+  } catch (error) {
+    toast(error.message || String(error), "error");
+  }
+}
+
 function renderBackendPill() {
   const pill = byId("backend-pill");
   pill.textContent = { wails: "wails", http: "http", mock: "demo", unknown: "…" }[bridge.kind] || bridge.kind;
@@ -447,6 +479,7 @@ function applySnapshot(snapshot) {
 
   // Stats + runtime
   renderStats(snapshot.stats || {});
+  renderRuntime(snapshot.runtime || {});
   state.running = !!(snapshot.runtime && snapshot.runtime.running);
   state.runMode = (snapshot.runtime && snapshot.runtime.mode) || "";
   renderRunning();
@@ -841,6 +874,7 @@ async function detectBrowser(showToast) {
   try {
     const status = await bridge.invoke("GetBrowserStatus");
     renderBrowserStatus(status);
+    renderBrowserPill(status);
     if (showToast) toast(status.found ? `${status.name} detected` : "No browser found", status.found ? "ok" : "error");
     return status;
   } catch (error) {
@@ -1230,6 +1264,7 @@ function bindActions() {
   byId("wk-save").addEventListener("click", () => saveSection("worker", readWorkerSettings(), "wk-status"));
   byId("wk-proxy-save").addEventListener("click", () => saveSection("proxy", readProxy(), "wk-proxy-status"));
   byId("wk-proxy-test").addEventListener("click", testProxy);
+  byId("open-data").addEventListener("click", openDataFolder);
   byId("wk-browser-save").addEventListener("click", saveBrowserSettings);
   byId("wk-browser-detect").addEventListener("click", () => detectBrowser(true));
   byId("worker-start").addEventListener("click", startWorker);

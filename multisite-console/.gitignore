@@ -15,3 +15,8 @@ sites/*/logs/
 # local test artefacts
 /tmp/
 settings.json.corrupt
+
+# desktop build output (wails)
+build/bin/
+desktop/build/bin/
+desktop/frontend/dist/*.map

@@ -9,7 +9,7 @@ package core
 import "time"
 
 // Version is shown in the sidebar tooltip and in the API snapshot.
-const Version = "0.4.0-step4"
+const Version = "0.5.0-step5"
 
 // Selectors is the per-site CSS bundle used by the DOM driver.
 // Field names match sites/<id>/site.json exactly.
