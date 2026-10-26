@@ -1,0 +1,252 @@
+{
+  "kit": "chitchat-design-kit",
+  "version": "1.0.0",
+  "generated": "2026-10-26",
+  "file_count": 44,
+  "total_bytes": 417986,
+  "start_here": [
+    "PROMPT.txt",
+    "README.md",
+    "00-START-HERE.md",
+    "01-AGENT-BRIEF.md"
+  ],
+  "sections": {
+    "docs": "00- .. 13- markdown + AGENTS.md + design-tokens.json",
+    "starter": "runnable generic dashboard (index.html, styles.css, app.js, js/mock-backend.js)",
+    "extras": "Go App skeleton + contract parity test",
+    "reference": "original source (frontend + selected Go), read-only"
+  },
+  "run_starter": "cd starter && python3 -m http.server 8080",
+  "verify": [
+    "node --check starter/app.js",
+    "node --test extras/contract.test.cjs"
+  ],
+  "files": [
+    {
+      "path": "00-START-HERE.md",
+      "bytes": 5694,
+      "sha256": "6d031731d056f157"
+    },
+    {
+      "path": "01-AGENT-BRIEF.md",
+      "bytes": 4475,
+      "sha256": "881c6524ee2423ca"
+    },
+    {
+      "path": "02-ARCHITECTURE.md",
+      "bytes": 8954,
+      "sha256": "0110f930b0f30b9e"
+    },
+    {
+      "path": "03-TECH-STACK.md",
+      "bytes": 7159,
+      "sha256": "04b2df30f4fb62e6"
+    },
+    {
+      "path": "04-UI-DESIGN-SYSTEM.md",
+      "bytes": 13731,
+      "sha256": "a780458f87c1c000"
+    },
+    {
+      "path": "05-DASHBOARD-SPEC.md",
+      "bytes": 8137,
+      "sha256": "930a95e8bfd342bf"
+    },
+    {
+      "path": "06-FRONTEND-PATTERNS.md",
+      "bytes": 11007,
+      "sha256": "f7a1390e342f8b72"
+    },
+    {
+      "path": "07-BACKEND-PATTERNS.md",
+      "bytes": 11962,
+      "sha256": "ba244dd3f85c14b9"
+    },
+    {
+      "path": "08-API-CONTRACT.md",
+      "bytes": 7617,
+      "sha256": "18ee319bd3f6fc8b"
+    },
+    {
+      "path": "09-FILE-MAP.md",
+      "bytes": 6298,
+      "sha256": "4ea7d322b3d97e0d"
+    },
+    {
+      "path": "10-REBRAND-FOR-NEW-SITE.md",
+      "bytes": 8343,
+      "sha256": "990cf670501e5cde"
+    },
+    {
+      "path": "11-BUILD-RUNBOOK.md",
+      "bytes": 6248,
+      "sha256": "cd883a656d0bd7fb"
+    },
+    {
+      "path": "12-CHECKLIST-70-30.md",
+      "bytes": 5082,
+      "sha256": "7665a55c7b72d411"
+    },
+    {
+      "path": "13-AGENT-PROMPTS.md",
+      "bytes": 6200,
+      "sha256": "33d83038642deede"
+    },
+    {
+      "path": "AGENTS.md",
+      "bytes": 5291,
+      "sha256": "b2acb6972e756e44"
+    },
+    {
+      "path": "PROMPT.txt",
+      "bytes": 2097,
+      "sha256": "954d45a24e8414e6"
+    },
+    {
+      "path": "README.md",
+      "bytes": 6212,
+      "sha256": "3d9ba99fc5cd5405"
+    },
+    {
+      "path": "TEST-REPORT.md",
+      "bytes": 3309,
+      "sha256": "a6a3b6a694de5e55"
+    },
+    {
+      "path": "design-tokens.json",
+      "bytes": 4235,
+      "sha256": "706f0ae5470d307a"
+    },
+    {
+      "path": "extras/app-skeleton.go",
+      "bytes": 8872,
+      "sha256": "7efa9dde4a4378a1"
+    },
+    {
+      "path": "extras/contract.test.cjs",
+      "bytes": 4465,
+      "sha256": "3738677728757ad9"
+    },
+    {
+      "path": "reference/README.md",
+      "bytes": 3657,
+      "sha256": "abc27fb9e5583c94"
+    },
+    {
+      "path": "reference/frontend/dashboard-app.js",
+      "bytes": 40350,
+      "sha256": "426d1c323f8ae09a"
+    },
+    {
+      "path": "reference/frontend/dashboard-index.html",
+      "bytes": 27153,
+      "sha256": "9b3a279bd8242682"
+    },
+    {
+      "path": "reference/frontend/dashboard-styles.css",
+      "bytes": 17276,
+      "sha256": "0e4677237da7156a"
+    },
+    {
+      "path": "reference/frontend/studio-app.js",
+      "bytes": 14931,
+      "sha256": "b8ebd1c5b1e8690b"
+    },
+    {
+      "path": "reference/frontend/studio-index.html",
+      "bytes": 8561,
+      "sha256": "51ce0b1cf8d14122"
+    },
+    {
+      "path": "reference/frontend/studio-styles.css",
+      "bytes": 7414,
+      "sha256": "6d607880c4ffa9a1"
+    },
+    {
+      "path": "reference/go/apichat-main.go",
+      "bytes": 11203,
+      "sha256": "0acae55d88d41e33"
+    },
+    {
+      "path": "reference/go/app-methods-excerpt.go",
+      "bytes": 1604,
+      "sha256": "ab0b4fc8396b47d3"
+    },
+    {
+      "path": "reference/go/chitchatui-main.go",
+      "bytes": 3335,
+      "sha256": "754c93e1805175c4"
+    },
+    {
+      "path": "reference/go/install.bat",
+      "bytes": 13543,
+      "sha256": "004c7c26afd62d77"
+    },
+    {
+      "path": "reference/go/model-ui.go",
+      "bytes": 10187,
+      "sha256": "a657650823567436"
+    },
+    {
+      "path": "reference/go/openai-client.go",
+      "bytes": 4760,
+      "sha256": "5c95ee5084d4c172"
+    },
+    {
+      "path": "reference/go/package.json",
+      "bytes": 724,
+      "sha256": "e266b9f57cc08dc0"
+    },
+    {
+      "path": "reference/go/run-dashboard.bat",
+      "bytes": 590,
+      "sha256": "b1e028dd84a0b359"
+    },
+    {
+      "path": "reference/go/test.bat",
+      "bytes": 2162,
+      "sha256": "481d1af4774548b6"
+    },
+    {
+      "path": "reference/go/uistore-store.go",
+      "bytes": 18113,
+      "sha256": "fb37f73c40addd4a"
+    },
+    {
+      "path": "reference/go/wails.json",
+      "bytes": 304,
+      "sha256": "508b4d70d8e29ef7"
+    },
+    {
+      "path": "starter/README.md",
+      "bytes": 3183,
+      "sha256": "fa82a51e052ea046"
+    },
+    {
+      "path": "starter/app.js",
+      "bytes": 29471,
+      "sha256": "30f145348a8fa379"
+    },
+    {
+      "path": "starter/index.html",
+      "bytes": 24682,
+      "sha256": "9031e04539f96fa0"
+    },
+    {
+      "path": "starter/js/mock-backend.js",
+      "bytes": 6553,
+      "sha256": "af70958b5d694ba5"
+    },
+    {
+      "path": "starter/styles.css",
+      "bytes": 22842,
+      "sha256": "e5efa175576bf44e"
+    }
+  ],
+  "verified": {
+    "report": "TEST-REPORT.md",
+    "contract_tests": "7/7 PASS",
+    "ui_assertions": "27/27 PASS",
+    "date": "2026-10-26"
+  }
+}

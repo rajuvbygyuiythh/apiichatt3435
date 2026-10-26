@@ -1,0 +1,41 @@
+================================================================================
+ PASTE THIS INTO YOUR AI AGENT (Cursor / Claude Code / Codex / whatever)
+================================================================================
+
+You are building a new admin dashboard from a design kit that is in this folder.
+
+STEP 1  Read these files, in this order, before writing any code:
+        00-START-HERE.md
+        01-AGENT-BRIEF.md            (hard rules — follow them exactly)
+        04-UI-DESIGN-SYSTEM.md
+        05-DASHBOARD-SPEC.md
+        06-FRONTEND-PATTERNS.md
+        08-API-CONTRACT.md
+        10-REBRAND-FOR-NEW-SITE.md
+        12-CHECKLIST-70-30.md
+
+STEP 2  Copy starter/ into the new project's frontend folder
+        (cmd/<app>/ui/ for a Wails project). Do NOT rewrite styles.css.
+        Run it first with:  cd starter && python3 -m http.server 8080
+        It must work on the mock backend before you change anything.
+
+STEP 3  Fill in the "step 0" table from 10-REBRAND-FOR-NEW-SITE.md for the new
+        product and write it to NOTES.md. Do not start coding before that table
+        is complete.
+
+STEP 4  Implement in the exact order of 10-REBRAND-FOR-NEW-SITE.md:
+        brand -> section names -> Go structs + storage -> form read/apply ->
+        Test/Run/Stop -> log vocabulary -> data folder -> delete the mock.
+
+STEP 5  Verify with 12-CHECKLIST-70-30.md (sections A, B, C) and report every
+        item as PASS / FAIL / NOT RUN. Never mark something PASS if you did not
+        actually run it.
+
+RULES YOU MAY NOT BREAK
+  - 2 top-level modes, exactly 5 sub-sections each. No new visual patterns.
+  - styles.css is frozen; additions only at the end, tokens only, no hex.
+  - All backend calls go through bridge.invoke("Method", arg). Nothing else.
+  - One field = one HTML input + one read line + one setValue line. No duplicates.
+  - Every action shows a status line, a log row, or a toast. Errors are never silent.
+  - No framework, no bundler, no new npm dependency on the frontend.
+================================================================================
