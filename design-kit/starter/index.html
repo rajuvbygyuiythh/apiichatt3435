@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="forest">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>App Console — Design Kit Starter</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="shell visible">
+    <!-- ==================================================================
+         SIDEBAR — brand + 2 top-level modes + 5-step subnav per mode.
+         Rename the two modes for your site (they are just routing groups).
+         ================================================================== -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark" id="brand-mark">AC</div>
+        <div>
+          <div class="brand-title" id="brand-title">App Console</div>
+          <div class="brand-subtitle" id="brand-subtitle">Design kit · Go + WebView</div>
+        </div>
+      </div>
+
+      <nav class="nav" aria-label="Main modes">
+        <button class="nav-button active" data-tab="studio">Studio</button>
+        <button class="nav-button" data-tab="ops">Ops</button>
+      </nav>
+
+      <nav class="subnav" id="subnav-studio" aria-label="Studio sections">
+        <button class="subnav-button active" data-subpanel="studio-setup">Setup</button>
+        <button class="subnav-button" data-subpanel="studio-connections">Connections</button>
+        <button class="subnav-button" data-subpanel="studio-actions">Actions</button>
+        <button class="subnav-button" data-subpanel="studio-run">Run</button>
+        <button class="subnav-button" data-subpanel="studio-logs">Live Logs</button>
+      </nav>
+
+      <nav class="subnav" id="subnav-ops" aria-label="Ops sections" hidden>
+        <button class="subnav-button active" data-subpanel="ops-account">Account</button>
+        <button class="subnav-button" data-subpanel="ops-connections">Connections</button>
+        <button class="subnav-button" data-subpanel="ops-actions">Actions</button>
+        <button class="subnav-button" data-subpanel="ops-settings">Settings</button>
+        <button class="subnav-button" data-subpanel="ops-logs">Live Logs</button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="status-row">
+          <span class="status-label">Workers</span>
+          <span id="running-pill" class="pill stopped">Stopped</span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">Backend</span>
+          <span id="backend-pill" class="pill stopped">demo</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <!-- ======================== MODE 1 · STUDIO ======================== -->
+      <section class="tab-panel active" data-panel="studio">
+        <header class="panel-header">
+          <div>
+            <div class="title-row">
+              <h1>Studio</h1>
+              <span id="studio-run-badge" class="mode-badge">Idle</span>
+            </div>
+            <p>Configure the job, press Run, watch the live log. One click saves every section first.</p>
+          </div>
+          <div class="actions">
+            <label class="theme-picker">
+              Theme
+              <select id="theme-select" aria-label="Theme">
+                <option value="forest">Forest</option>
+                <option value="ocean">Ocean</option>
+                <option value="light">Light</option>
+              </select>
+            </label>
+            <button id="studio-refresh" class="secondary-button" type="button">Refresh</button>
+          </div>
+        </header>
+
+        <!-- starter-only: proves the UI runs without a backend. Delete it. -->
+        <div class="demo-banner" id="demo-banner" hidden>
+          <span><strong>Demo backend active.</strong> The UI is running on in-memory mock data — no Go or HTTP backend connected.</span>
+          <button id="demo-hide" type="button">Hide</button>
+        </div>
+
+        <div class="home-stats" aria-label="Job status">
+          <div class="stat-capsule"><span>Running</span><strong id="stat-running">0</strong></div>
+          <div class="stat-capsule"><span>Profiles</span><strong id="stat-profiles">0</strong></div>
+          <div class="stat-capsule"><span>Completed</span><strong id="stat-done">0</strong></div>
+          <div class="stat-capsule"><span>Queue</span><strong id="stat-queue">0</strong></div>
+          <div class="stat-capsule danger"><span>Failures</span><strong id="stat-failed">0</strong></div>
+        </div>
+
+        <!-- ---------------------- 1 · SETUP ---------------------- -->
+        <section class="subpanel active" data-subpanel="studio-setup">
+          <div class="subpage narrow">
+            <section class="card">
+              <div class="step-head"><span class="step-num">1</span><h2>Setup</h2></div>
+              <p class="hint-text">Generic form patterns: text, select, number, checkbox and textarea in a responsive grid.</p>
+
+              <div class="form-grid two-column">
+                <label>
+                  <span>Workspace name</span>
+                  <input type="text" id="setup-name" placeholder="my-workspace" autocomplete="off">
+                </label>
+                <label>
+                  <span>Mode</span>
+                  <select id="setup-mode">
+                    <option value="fast">Fast</option>
+                    <option value="balanced">Balanced</option>
+                    <option value="careful">Careful</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Concurrency</span>
+                  <input type="number" id="setup-concurrency" min="1" max="64" step="1" value="2">
+                </label>
+                <label>
+                  <span>Timeout (s)</span>
+                  <input type="number" id="setup-timeout" min="1" max="3600" step="1" value="60">
+                </label>
+              </div>
+
+              <label class="checkbox-row">
+                <input type="checkbox" id="setup-headless">
+                <span>Run headless (no visible window)</span>
+              </label>
+
+              <label>
+                <span>Notes / instructions</span>
+                <textarea id="setup-notes" rows="4" placeholder="Anything the runner should know. One line = one rule."></textarea>
+              </label>
+
+              <div class="form-actions inline">
+                <button id="setup-save" class="primary-button" type="button">Save Setup</button>
+                <span id="setup-status" class="status-line" role="status" aria-live="polite"></span>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <!-- -------------------- 2 · CONNECTIONS -------------------- -->
+        <section class="subpanel" data-subpanel="studio-connections">
+          <div class="subpage">
+            <div class="card-grid">
+              <section class="card">
+                <div class="step-head"><span class="step-num">2</span><h2>Connections</h2></div>
+                <p class="hint-text">One-line-per-entry input + a Test button + a per-line result list. This is the pattern the original used for proxies; reuse it for API keys, endpoints, webhooks or accounts.</p>
+
+                <label class="checkbox-row">
+                  <input type="checkbox" id="studio-conn-enabled">
+                  <span>Use these connections</span>
+                </label>
+
+                <label>
+                  <span>Default protocol</span>
+                  <select id="studio-conn-scheme">
+                    <option value="http">HTTP</option>
+                    <option value="socks5">SOCKS5</option>
+                    <option value="https">HTTPS</option>
+                  </select>
+                </label>
+
+                <label>
+                  <span>Entries (one per line)</span>
+                  <textarea id="studio-conn-entries" rows="5" placeholder="host:port&#10;host:port:user:pass&#10;scheme://user:pass@host:port"></textarea>
+                </label>
+
+                <div class="form-actions">
+                  <button id="conn-test" class="secondary-button" type="button">Test Connections</button>
+                </div>
+                <p id="studio-conn-status" class="status-line" role="status" aria-live="polite">Not tested.</p>
+                <div id="studio-conn-results" class="proxy-results"></div>
+              </section>
+
+              <section class="card">
+                <div class="step-head"><span class="step-num">+</span><h2>Credential block</h2></div>
+                <p class="hint-text">Keep secrets out of logs. Mask them in the UI, write them only to the local data file.</p>
+                <label>
+                  <span>API base URL</span>
+                  <input type="text" id="cred-base-url" placeholder="https://api.example.com/v1">
+                </label>
+                <label>
+                  <span>API key</span>
+                  <input type="password" id="cred-api-key" placeholder="sk-... / rc_..." autocomplete="off">
+                </label>
+                <label>
+                  <span>Model / resource</span>
+                  <input type="text" id="cred-model" placeholder="default-model">
+                </label>
+                <label>
+                  <span>Temperature (0.1 – 2.0)</span>
+                  <input type="number" id="cred-temperature" min="0.1" max="2" step="0.05" value="0.8">
+                </label>
+                <div class="form-actions inline">
+                  <button id="cred-test" class="secondary-button" type="button">Test API</button>
+                  <span id="cred-test-status" class="status-line" role="status" aria-live="polite"></span>
+                </div>
+              </section>
+            </div>
+          </div>
+        </section>
+
+        <!-- ---------------------- 3 · ACTIONS ---------------------- -->
+        <section class="subpanel" data-subpanel="studio-actions">
+          <div class="subpage">
+            <section class="card">
+              <div class="step-head"><span class="step-num">3</span><h2>Actions</h2></div>
+              <p class="hint-text">Radio-card group = one mutually exclusive strategy. Each strategy reveals its own block; the other blocks stay in the DOM and keep their typed values (see <code>formStore</code> in app.js).</p>
+
+              <div class="chat-mode-card">
+                <span class="mode-label">Strategy</span>
+                <div class="mode-options">
+                  <label class="mode-option" id="act-option-single">
+                    <input type="radio" name="act-strategy" value="single" id="act-strategy-single" checked>
+                    <span>Single sequence</span>
+                  </label>
+                  <label class="mode-option" id="act-option-folder">
+                    <input type="radio" name="act-strategy" value="folder" id="act-strategy-folder">
+                    <span>Folder of sequences</span>
+                  </label>
+                  <label class="mode-option" id="act-option-model">
+                    <input type="radio" name="act-strategy" value="model" id="act-strategy-model">
+                    <span>Model-written</span>
+                  </label>
+                </div>
+              </div>
+
+              <div id="act-section-single">
+                <label>
+                  <span>Sequence (one line = one step)</span>
+                  <textarea id="act-sequence" rows="7" placeholder="hello %username%&#10;checking now, one moment"></textarea>
+                </label>
+                <p class="hint-text">Placeholder convention: <code>%username%</code> inserts a random handle, <code>{hello|hi}</code> picks one variant.</p>
+              </div>
+
+              <div id="act-section-folder" style="display: none;">
+                <div class="form-actions inline">
+                  <button id="act-load-folder" class="secondary-button" type="button">Load Folder</button>
+                  <button id="act-clean-folder" class="danger-button" type="button">Clean Loaded</button>
+                  <span id="act-folder-status" class="status-line">0 sequences loaded</span>
+                </div>
+              </div>
+
+              <div id="act-section-model" style="display: none;">
+                <div class="form-actions inline">
+                  <button id="act-open-data" class="secondary-button" type="button">Open Data Folder</button>
+                  <span id="act-data-status" class="status-line">Prompts are read from the data folder.</span>
+                </div>
+                <p class="hint-text">Model mode reuses the credential block from <strong>Connections</strong> — one source of truth for API settings.</p>
+              </div>
+
+              <label>
+                <span>Targets / usernames (one per line)</span>
+                <textarea id="act-targets" rows="3" placeholder="@handle_one&#10;handle_two"></textarea>
+              </label>
+
+              <div class="form-actions inline">
+                <button id="act-save" class="primary-button" type="button">Save Actions</button>
+                <span id="act-save-status" class="status-line" role="status" aria-live="polite"></span>
+              </div>
+            </section>
+
+            <section class="card" style="margin-top: 16px;">
+              <h2>Recent items</h2>
+              <p class="hint-text">Table pattern for list data — the only place a table is used in this design. Everything else is cards.</p>
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr><th>#</th><th>Item</th><th>Profile</th><th>State</th><th>Updated</th></tr>
+                  </thead>
+                  <tbody id="items-body">
+                    <tr><td colspan="5">No items yet.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <!-- ------------------------ 4 · RUN ------------------------ -->
+        <section class="subpanel" data-subpanel="studio-run">
+          <div class="subpage narrow">
+            <section class="card run-card">
+              <div class="step-head"><span class="step-num">4</span><h2>Run</h2></div>
+
+              <div class="profile-choice" role="radiogroup" aria-label="Select profile">
+                <span class="mode-label">Select profile</span>
+                <div class="mode-options">
+                  <label class="mode-option" id="run-profile-option-default">
+                    <input type="radio" name="run-profile" value="default" id="run-profile-default" checked>
+                    <span>default</span>
+                  </label>
+                  <label class="mode-option" id="run-profile-option-saved">
+                    <input type="radio" name="run-profile" value="session" id="run-profile-saved">
+                    <span>saved session</span>
+                  </label>
+                </div>
+              </div>
+              <p class="hint-text">default = fresh start; saved session = reuse the stored login/profile.</p>
+
+              <button id="studio-run" class="primary-button run-button" type="button">&#9654; Run</button>
+              <p id="studio-run-status" class="status-line" role="status" aria-live="polite">Idle.</p>
+              <p class="hint-text">Run saves Setup + Connections + Actions, then starts the job. Close the window (or press Stop) to end it.</p>
+            </section>
+          </div>
+        </section>
+
+        <!-- ---------------------- 5 · LIVE LOGS ---------------------- -->
+        <section class="subpanel" data-subpanel="studio-logs">
+          <div class="subpage">
+            <section class="card log-card">
+              <div class="log-header">
+                <div class="step-head" style="margin: 0;"><span class="step-num">5</span><h2>Live Logs</h2></div>
+                <div class="log-tools">
+                  <select id="studio-log-filter" aria-label="Filter studio logs">
+                    <option value="all">All</option>
+                    <option value="io">IN / OUT</option>
+                    <option value="rules">Rules</option>
+                    <option value="errors">Errors</option>
+                  </select>
+                  <button id="studio-log-clear" class="secondary-button" type="button">Clear</button>
+                </div>
+              </div>
+              <div id="studio-log-list" class="log-list" aria-live="polite"></div>
+              <p id="studio-log-empty" class="hint-text">No activity yet. Press Run.</p>
+            </section>
+          </div>
+        </section>
+      </section>
+
+      <!-- ========================= MODE 2 · OPS ========================= -->
+      <section class="tab-panel" data-panel="ops">
+        <header class="panel-header">
+          <div>
+            <div class="title-row">
+              <h1>Ops</h1>
+              <span class="mode-badge">Background worker</span>
+            </div>
+            <p>Same five sections, different job. Start/stop lives in the header so it is always reachable.</p>
+            <p id="ops-summary" class="hint-text"></p>
+          </div>
+          <div class="actions">
+            <button id="ops-start" class="primary-button" type="button">Save &amp; Start</button>
+            <button id="ops-stop" class="secondary-button" type="button">Stop</button>
+            <button id="ops-refresh" class="secondary-button" type="button">Refresh</button>
+          </div>
+        </header>
+
+        <p id="ops-status" class="status-line" role="status" aria-live="polite">Idle.</p>
+
+        <section class="subpanel active" data-subpanel="ops-account">
+          <div class="subpage narrow">
+            <section class="card">
+              <div class="step-head"><span class="step-num">1</span><h2>Account</h2></div>
+              <p class="hint-text">Open a browser once for a manual login, then reuse the saved session. Nothing here is site-specific except the URL you log into.</p>
+              <div class="form-grid">
+                <label>
+                  <span>Profile</span>
+                  <input type="text" id="ops-profile" placeholder="default" autocomplete="off" list="ops-profile-options">
+                </label>
+                <datalist id="ops-profile-options"></datalist>
+                <p id="ops-profile-session" class="hint-text">Saved profiles are restored automatically.</p>
+                <label>
+                  <span>Browser mode</span>
+                  <select id="ops-backend">
+                    <option value="rod">Rod</option>
+                    <option value="chromedp">ChromeDP</option>
+                  </select>
+                </label>
+                <label class="checkbox-row">
+                  <input type="checkbox" id="ops-headless">
+                  <span>Headless (keep off for manual login)</span>
+                </label>
+              </div>
+              <div class="form-actions">
+                <button id="ops-launch-login" class="secondary-button" type="button">Launch for Login</button>
+              </div>
+              <p id="ops-login-status" class="status-line" role="status" aria-live="polite">No browser launched.</p>
+            </section>
+          </div>
+        </section>
+
+        <section class="subpanel" data-subpanel="ops-connections">
+          <div class="subpage narrow">
+            <section class="card">
+              <div class="step-head"><span class="step-num">2</span><h2>Connections</h2></div>
+              <p class="hint-text">Identical component to Studio · Connections. Copy the markup, keep the pattern.</p>
+              <label class="checkbox-row">
+                <input type="checkbox" id="ops-conn-enabled">
+                <span>Use these connections</span>
+              </label>
+              <label>
+                <span>Entries (one per line)</span>
+                <textarea id="ops-conn-entries" rows="5" placeholder="1.2.3.4:8080&#10;1.2.3.5:8080:user:pass"></textarea>
+              </label>
+              <div class="form-actions">
+                <button id="ops-conn-test" class="secondary-button" type="button">Test Connections</button>
+              </div>
+              <p id="ops-conn-status" class="status-line" role="status" aria-live="polite">Not tested.</p>
+              <div id="ops-conn-results" class="proxy-results"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="subpanel" data-subpanel="ops-actions">
+          <div class="subpage narrow">
+            <section class="card">
+              <div class="step-head"><span class="step-num">3</span><h2>Actions</h2></div>
+              <label>
+                <span>Sequence (one line = one step)</span>
+                <textarea id="ops-sequence" rows="7" placeholder="hello %username%&#10;ok, checking. wait a bit."></textarea>
+              </label>
+              <label>
+                <span>Targets (one per line)</span>
+                <textarea id="ops-targets" rows="3" placeholder="@handle_one&#10;handle_two"></textarea>
+              </label>
+              <div class="form-actions inline">
+                <button id="ops-save-actions" class="primary-button" type="button">Save Actions</button>
+                <span id="ops-actions-status" class="status-line" role="status" aria-live="polite"></span>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="subpanel" data-subpanel="ops-settings">
+          <div class="subpage">
+            <section class="card">
+              <div class="step-head"><span class="step-num">4</span><h2>Settings</h2></div>
+              <p class="hint-text">Min/max pair inputs are the house pattern for any randomised timing. Keep them in a two-column grid, seconds in the label.</p>
+              <div class="form-grid two-column">
+                <label><span>Poll min (s)</span><input type="number" id="ops-poll-min" min="1" max="86400" step="1" value="5"></label>
+                <label><span>Poll max (s)</span><input type="number" id="ops-poll-max" min="1" max="86400" step="1" value="12"></label>
+                <label><span>Action min (s)</span><input type="number" id="ops-action-min" min="1" max="86400" step="1" value="3"></label>
+                <label><span>Action max (s)</span><input type="number" id="ops-action-max" min="1" max="86400" step="1" value="8"></label>
+                <label><span>Timeout min (s)</span><input type="number" id="ops-timeout-min" min="0" max="86400" step="1" value="60"></label>
+                <label><span>Timeout max (s)</span><input type="number" id="ops-timeout-max" min="0" max="86400" step="1" value="90"></label>
+                <label><span>Retry min (s)</span><input type="number" id="ops-retry-min" min="0" max="86400" step="1" value="10"></label>
+                <label><span>Retry max (s)</span><input type="number" id="ops-retry-max" min="0" max="86400" step="1" value="30"></label>
+              </div>
+              <div class="form-actions inline">
+                <button id="ops-save-settings" class="primary-button" type="button">Save Settings</button>
+                <span id="ops-settings-status" class="status-line" role="status" aria-live="polite"></span>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="subpanel" data-subpanel="ops-logs">
+          <div class="subpage">
+            <section class="card log-card">
+              <div class="log-header">
+                <div class="step-head" style="margin: 0;"><span class="step-num">5</span><h2>Live Logs</h2></div>
+                <div class="log-tools">
+                  <select id="ops-log-filter" aria-label="Filter ops logs">
+                    <option value="all">All</option>
+                    <option value="io">IN / OUT</option>
+                    <option value="rules">Rules</option>
+                    <option value="errors">Errors</option>
+                  </select>
+                  <button id="ops-log-clear" class="secondary-button" type="button">Clear</button>
+                </div>
+              </div>
+              <div id="ops-log-list" class="log-list" aria-live="polite"></div>
+              <p id="ops-log-empty" class="hint-text">No activity yet. Press Save &amp; Start.</p>
+            </section>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast-wrap" id="toast-wrap" aria-live="polite"></div>
+
+  <!-- mock backend: delete these two lines when a real backend exists -->
+  <script src="./js/mock-backend.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

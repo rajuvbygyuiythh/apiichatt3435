@@ -1,0 +1,83 @@
+{
+  "$comment": "Design tokens for the ChitChat console design kit. Every value here exists in starter/styles.css. Never use raw literals in new CSS — reference these.",
+  "meta": {
+    "kit": "chitchat-design-kit",
+    "version": "1.0.0",
+    "themes": ["forest", "ocean", "light"],
+    "defaultTheme": "forest",
+    "targetViewport": { "width": 1280, "height": 820, "minWidth": 1080, "minHeight": 700 }
+  },
+  "font": {
+    "body": "\"Segoe UI\", Arial, sans-serif",
+    "mono": "ui-monospace, \"Cascadia Mono\", Consolas, monospace",
+    "size": { "h1": 24, "h2": 16, "body": 15, "control": 13.5, "label": 12.5, "stat": 17, "log": 12.5, "logMeta": 11.5, "badge": 11, "micro": 10 },
+    "lineHeight": { "body": 1.45, "hint": 1.5 },
+    "weight": { "regular": 400, "medium": 600, "bold": 700 }
+  },
+  "space": [4, 6, 8, 10, 12, 14, 16, 18, 22, 24],
+  "radius": { "control": 8, "inset": 10, "card": 14, "pill": 999 },
+  "layout": {
+    "sidebarWidth": 238,
+    "mainMaxWidth": 1480,
+    "subpageWide": 1100,
+    "subpageNarrow": 760,
+    "cardPadding": 18,
+    "cardGap": 11,
+    "formGap": 12,
+    "statsColumns": 6,
+    "breakpoint": 900,
+    "logRowColumns": [60, 44, "1fr"],
+    "logPinTolerancePx": 60
+  },
+  "motion": {
+    "transition": "0.15s ease",
+    "toastInMs": 160,
+    "toastLifetimeMs": 4200,
+    "defaultPollMs": 1000,
+    "statsPollMs": 3000
+  },
+  "themes": {
+    "forest": {
+      "bg": "#161716", "sidebar": "#191b17", "panel": "#20221e", "panelAlt": "#282b25",
+      "panelStrong": "#30342d", "line": "#3e4439", "text": "#eef2e8", "muted": "#b5beb0",
+      "accent": "#83cb73", "accentStrong": "#6bb25b", "warn": "#d9b74d", "danger": "#d36a6a",
+      "logIn": "#7cc0d2", "logOut": "#dff3d6", "logError": "#ff9c9c"
+    },
+    "ocean": {
+      "bg": "#0b1120", "sidebar": "#0d1424", "panel": "#111827", "panelAlt": "#0f172a",
+      "panelStrong": "#1b2537", "line": "#1e293b", "text": "#f8fafc", "muted": "#94a3b8",
+      "accent": "#38bdf8", "accentStrong": "#0284c7", "warn": "#f59e0b", "danger": "#ef4444"
+    },
+    "light": {
+      "bg": "#f5f7f2", "sidebar": "#ecefe6", "panel": "#ffffff", "panelAlt": "#eff2ea",
+      "panelStrong": "#e3e8dc", "line": "#d4dac9", "text": "#1d2118", "muted": "#5c6455",
+      "accent": "#4f8f42", "accentStrong": "#3d7533", "warn": "#9a6c10", "danger": "#b04545"
+    }
+  },
+  "cssVariables": {
+    "colors": ["--bg", "--panel", "--panel-alt", "--panel-strong", "--line", "--text", "--muted", "--accent", "--accent-strong", "--warn", "--danger"],
+    "note": "Sidebar background is themed per-theme but not tokenised in the original; if you add many themes, promote it to --sidebar."
+  },
+  "components": {
+    "brandMark": { "size": 40, "radius": 9, "background": "accent", "text": "onAccent" },
+    "navButton": { "padding": "11px 14px", "radius": 8, "activeFill": "accent @ 10%", "activeBorder": "accent @ 45%" },
+    "subnavButton": { "padding": "7px 11px", "fontSize": 12.5, "activeFill": "accent @ 14%" },
+    "statCapsule": { "padding": "11px 14px", "radius": 999, "border": "accent @ 35%", "fill": "accent @ 10%" },
+    "card": { "padding": 18, "radius": 14, "background": "panel", "border": "1px solid line" },
+    "primaryButton": { "background": "accent", "text": "#162010", "padding": "9px 14px", "radius": 8 },
+    "secondaryButton": { "background": "panelAlt", "border": "line", "hoverBorder": "accent" },
+    "dangerButton": { "background": "transparent", "border": "danger @ 55%", "text": "#efb2b2" },
+    "modeOption": { "padding": "8px 12px", "radius": 8, "activeBorder": "accent", "activeFill": "accent @ 12%" },
+    "logRow": { "columns": "60px 44px 1fr", "padding": "7px 0", "divider": "line @ 45%" },
+    "statusLine": { "fontSize": 12.5, "okColor": "accent", "errorColor": "danger" },
+    "toast": { "radius": 9, "leftBorder": "3px accent", "shadow": "0 12px 30px rgb(0 0 0 / 28%)" }
+  },
+  "rules": [
+    "No colour literals outside :root token blocks.",
+    "No gradients, no card shadows (toasts only), no emoji in navigation.",
+    "Radii: 8 controls, 10 insets, 14 cards, 999 pills.",
+    "One accent colour per theme; warn/danger only for state.",
+    "One breakpoint at 900px.",
+    "Every new theme must define all twelve colour tokens."
+  ]
+}
