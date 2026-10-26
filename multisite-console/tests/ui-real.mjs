@@ -42,6 +42,18 @@ await wait(700);
 const driverText = $("site-driver-code").textContent;
 ok("driver viewer reads real files", !$("site-driver-code").hidden && driverText.includes("composer_input"), driverText.slice(0, 60).replace(/\n/g, " "));
 
+// ---------- step 4: browser driver truth on this machine ----------
+const browserStatus = await (await fetch(BASE + "/api/GetBrowserStatus")).json();
+ok("GetBrowserStatus endpoint", typeof browserStatus.found === "boolean", JSON.stringify(browserStatus).slice(0, 90));
+await wait(300);
+ok("browser status rendered", $("wk-browser-status").textContent.length > 0, $("wk-browser-status").textContent);
+if (!browserStatus.found) {
+  ok("missing browser is explained", /No Chrome|install/i.test($("wk-browser-status").textContent), $("wk-browser-status").textContent);
+  $("site-browser-check").click();
+  await wait(800);
+  ok("browser check fails cleanly", /Chrome|browser/i.test($("site-browser-status").textContent), $("site-browser-status").textContent);
+}
+
 // ---------- step 3: diagnostics from the Go core ----------
 await wait(400);
 const diagItems = [...window.document.querySelectorAll("#site-diag-checks .diag-item")];
@@ -98,6 +110,9 @@ await wait(6000);
 const rows = $("worker-log-list").children.length;
 ok("live logs from Go ring", rows > 0, rows + " rows");
 ok("log rows carry site ids", /omezy|camgo|chat42|chatusa|viby/.test($("worker-log-list").textContent));
+if (!browserStatus.found) {
+  ok("simulation mode is stated honestly", /SIMULATION|simulation/.test($("worker-log-list").textContent), "ok");
+}
 $("worker-stop").click();
 await wait(900);
 ok("stopped (Go)", $("running-pill").textContent === "Stopped");

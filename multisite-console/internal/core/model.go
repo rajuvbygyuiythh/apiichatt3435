@@ -9,7 +9,7 @@ package core
 import "time"
 
 // Version is shown in the sidebar tooltip and in the API snapshot.
-const Version = "0.3.0-step3"
+const Version = "0.4.0-step4"
 
 // Selectors is the per-site CSS bundle used by the DOM driver.
 // Field names match sites/<id>/site.json exactly.
@@ -82,6 +82,14 @@ type ShowSettings struct {
 }
 
 // WorkerSettings is Mode B: headless workers across several sites.
+// BrowserSettings controls the real browser driver (step 4).
+type BrowserSettings struct {
+	Path          string `json:"path"`            // explicit binary path, "" = auto-discover
+	Headless      bool   `json:"headless"`        // worker default; Show mode always visible
+	PageTimeoutMS int    `json:"page_timeout_ms"` // per navigation / wait budget
+	KeepProfile   bool   `json:"keep_profile"`    // reuse sites/<id>/profiles/<profile>
+}
+
 type WorkerSettings struct {
 	Sites       []string `json:"sites"`
 	Profile     string   `json:"profile"`
@@ -127,6 +135,7 @@ type Settings struct {
 	Worker   WorkerSettings  `json:"worker"`
 	Message  MessageSettings `json:"message"`
 	Proxy    ProxySettings   `json:"proxy"`
+	Browser  BrowserSettings `json:"browser"`
 	Accounts AccountSettings `json:"accounts"`
 }
 
@@ -233,6 +242,7 @@ func Defaults(siteIDs []string) Settings {
 		},
 		Message: MessageSettings{Strategy: "single", MaxLines: 3, Sequence: "hey there\nwhat's up?", Targets: ""},
 		Proxy:   ProxySettings{Enabled: false, Scheme: "http", Entries: ""},
+		Browser: BrowserSettings{Path: "", Headless: true, PageTimeoutMS: 45000, KeepProfile: true},
 		Accounts: AccountSettings{Count: 2, Gender: "female", Age: 21,
 			NicknamePool: "Sophia,Emma,Olivia,Mia,Chloe,Ava,Lily,Zoe,Hannah,Maya"},
 	}
@@ -266,6 +276,7 @@ func (s *Settings) Normalise(siteIDs []string) {
 	if s.Proxy.Scheme != "socks5" {
 		s.Proxy.Scheme = "http"
 	}
+	s.Browser.PageTimeoutMS = clamp(s.Browser.PageTimeoutMS, 5000, 180000)
 
 	switch s.Accounts.Gender {
 	case "female", "male", "random":

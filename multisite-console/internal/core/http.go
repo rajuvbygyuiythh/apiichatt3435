@@ -137,6 +137,30 @@ func (a *App) Handler(uiDir string) http.Handler {
 		writeJSON(w, driver, err)
 	})
 
+	mux.HandleFunc("/api/GetBrowserStatus", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, a.GetBrowserStatus(), nil)
+	})
+
+	mux.HandleFunc("/api/TestSiteBrowser", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			SiteID  string `json:"site_id"`
+			Profile string `json:"profile"`
+		}
+		if err := decodeBody(r, &req); err != nil {
+			writeJSON(w, nil, err)
+			return
+		}
+		if req.SiteID == "" {
+			req.SiteID = r.URL.Query().Get("id")
+		}
+		if req.SiteID == "" {
+			writeJSON(w, nil, errMissing("site_id"))
+			return
+		}
+		out, err := a.TestSiteBrowser(req.SiteID, req.Profile)
+		writeJSON(w, out, err)
+	})
+
 	mux.HandleFunc("/api/GetSiteDiagnostics", func(w http.ResponseWriter, r *http.Request) {
 		siteID := r.URL.Query().Get("id")
 		if siteID == "" {

@@ -110,9 +110,11 @@
 
               <div class="form-actions inline">
                 <button id="site-test" class="secondary-button" type="button">Test Site</button>
+                <button id="site-browser-check" class="secondary-button" type="button">Browser Check</button>
                 <button id="site-driver-load" class="secondary-button" type="button">View DOM Driver</button>
                 <span id="site-test-status" class="status-line" role="status" aria-live="polite">Not tested.</span>
               </div>
+              <p id="site-browser-status" class="status-line" role="status" aria-live="polite">Browser check not run.</p>
               <pre id="site-driver-code" class="code-block" hidden></pre>
 
               <div class="diag-block" id="site-diag">
@@ -513,6 +515,31 @@
               <div class="form-actions inline">
                 <button id="wk-save" class="primary-button" type="button">Save Settings</button>
                 <span id="wk-status" class="status-line" role="status" aria-live="polite"></span>
+              </div>
+            </section>
+
+            <section class="card" style="margin-top: 16px;">
+              <h2>Browser driver</h2>
+              <p class="hint-text">The console drives Chrome / Edge / Chromium over the DevTools protocol. Leave the path empty to auto-detect.</p>
+
+              <div class="form-grid two-column">
+                <label><span>Browser binary</span><input type="text" id="wk-browser-path" placeholder="auto-detect" autocomplete="off"></label>
+                <label><span>Page timeout (ms)</span><input type="number" id="wk-page-timeout" min="5000" max="180000" step="1000" value="45000"></label>
+              </div>
+
+              <label class="checkbox-row">
+                <input type="checkbox" id="wk-browser-headless">
+                <span>Headless browser (hidden window)</span>
+              </label>
+              <label class="checkbox-row">
+                <input type="checkbox" id="wk-keep-profile">
+                <span>Keep the profile folder between runs (recommended)</span>
+              </label>
+
+              <div class="form-actions inline">
+                <button id="wk-browser-save" class="primary-button" type="button">Save Browser</button>
+                <button id="wk-browser-detect" class="secondary-button" type="button">Detect</button>
+                <span id="wk-browser-status" class="status-line" role="status" aria-live="polite"></span>
               </div>
             </section>
 

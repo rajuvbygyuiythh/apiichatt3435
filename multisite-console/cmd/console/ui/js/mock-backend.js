@@ -67,6 +67,7 @@
     },
     message: { strategy: "single", sequence: "hey there\nwhat's up?", targets: "", max_lines: 3 },
     proxy: { enabled: false, scheme: "http", entries: "" },
+    browser: { path: "", headless: true, page_timeout_ms: 45000, keep_profile: true },
     accounts: { count: 2, gender: "female", age: 21, nickname_pool: "Sophia,Emma,Olivia,Mia,Chloe,Ava" },
   };
 
@@ -344,6 +345,35 @@
         latency_history: history.slice(-10),
         sequence_files: SEQUENCES.map((seq) => seq.name),
         ready: checks.every((check) => check.ok),
+      };
+    },
+
+    async GetBrowserStatus() {
+      await sleep(80);
+      return {
+        found: true,
+        path: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+        name: "Google Chrome",
+        source: "common-dir",
+        version: "Google Chrome 141.0.7390.66 (demo)",
+      };
+    },
+
+    async TestSiteBrowser(payload) {
+      await sleep(900);
+      const site = siteByID(payload && payload.site_id);
+      if (!site) throw new Error(`unknown site "${payload && payload.site_id}"`);
+      const ok = site.status === "ready";
+      push(ok ? "system" : "skip",
+        ok ? `browser check OK · phase=chatting · messages=2 · family=${site.family} phase=chatting input=true msgs=2 prot=clean`
+           : `browser check: page loaded but no composer yet · family=${site.family} phase=lobby input=false msgs=0 prot=clean`,
+        "dom", site.id);
+      return {
+        site_id: site.id, ok, phase: ok ? "chatting" : "lobby",
+        has_input: ok, can_send: ok, protection: "clean",
+        messages: ok ? 2 : 0, revision: ok ? 4 : 0,
+        probe: `family=${site.family} phase=${ok ? "chatting" : "lobby"} input=${ok} msgs=${ok ? 2 : 0} prot=clean`,
+        browser: "Google Chrome (demo)", screenshot: ok ? `data/screenshots/${site.id}-demo.png` : "",
       };
     },
 

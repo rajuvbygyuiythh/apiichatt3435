@@ -162,3 +162,25 @@ sites/<id>/
 New API methods (same one-object-argument rule): `GetSiteDiagnostics({site_id})` (no id →
 all sites), `GetSessions({site_id})`, `SaveSession({site_id,profile,values})`,
 `DeleteSession({site_id,profile})`. Mock backend implements all four with identical shapes.
+
+---
+
+## 10 · Step 4 — the browser driver is real (frozen with this step)
+
+| Piece | File | Decision |
+|---|---|---|
+| **WebSocket client** | `internal/core/ws.go` | hand-written client (handshake, masking, 7/16/64-bit lengths, ping/pong, close). The module stays stdlib-only: no gorilla, no chromedp, no Rod, `go test ./...` runs on a bare machine |
+| **CDP client** | `internal/core/cdp.go` | one socket, id↔reply map, `Runtime.evaluate` with `returnByValue`+`awaitPromise`, page-level commands only (no `Target.attach`, because `/json/list` already hands out per-page sockets) |
+| **Launcher** | `internal/core/browser.go` | free port + `--remote-debugging-port`, dedicated `--user-data-dir` per site profile, polls `/json/list` until a page target exists, then attaches; headless `--headless=new` for workers |
+| **Discovery** | `browser.go` | `MULTISITE_BROWSER` → settings path → per-OS common dirs → `PATH`. Status always returns candidates + a human note, never an error |
+| **Driver session** | `internal/core/driver.go` | injects the site's own `dom_driver.js`, then only uses its API: `probe()`, `snapshot()`, `focusInput()`, `readInput()`, `clearInput()`, `click([...])`. Sending = focus → `Input.insertText` → click SEND → verify the composer is empty |
+| **Runner** | `internal/core/run.go` | real path per site: launch → navigate → install driver → snapshot (phase/protection) → send each line → pump partner messages (deduped) → SKIP → `session.json`. No browser → loud `SIMULATION` mode instead of fake success |
+| **Stop** | `run.go` + `app.go` | `StopRun` cancels the context **and** closes every live browser (`closeAllDrivers`), so no orphan Chrome processes |
+| **Login** | `app.go` | `LaunchLogin` opens a *visible* window with that site's profile folder and returns the pid; `SaveSessionFromBrowser` counts the profile's cookie/storage files |
+| **Deep check** | `driver.go` | `TestSiteBrowser` = headless open + driver install + snapshot + PNG screenshot into `data/screenshots/` |
+| **Settings** | `model.go` | new `browser{path, headless, page_timeout_ms, keep_profile}` section, clamped on save |
+| **UI** | `ui/app.js`, `ui/index.html` | Browser driver card in Worker ▸ Settings (path/timeout/headless/keep + Detect), Browser Check button + status line in Show ▸ Site, browser status hydrated on boot |
+
+Why a fake-Chrome test instead of "trust me": the protocol surface (framing, ids, evaluate envelope,
+navigation, insertText, screenshot) is exactly where a hand-rolled client breaks. A scripted Chrome
+over a real socket exercises all of it in CI, including the full run cycle, with no browser installed.

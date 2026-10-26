@@ -99,6 +99,33 @@ ok("session deleted", $("sess-table-body").querySelectorAll("tr").length === 1, 
 ok("show log site options", $("show-log-site").options.length >= 5);
 ok("worker log site options", $("worker-log-site").options.length >= 5);
 
+// ---------- step 4: browser driver ----------
+window.document.querySelector('.nav-button[data-tab="worker"]').click();
+window.document.querySelector('[data-subpanel="worker-settings"]').click();
+await wait(300);
+ok("browser status line", $("wk-browser-status").textContent.includes("Google Chrome"), $("wk-browser-status").textContent);
+ok("browser headless default", $("wk-browser-headless").checked === true);
+ok("page timeout default", $("wk-page-timeout").value === "45000", $("wk-page-timeout").value);
+$("wk-page-timeout").value = "30000";
+$("wk-page-timeout").dispatchEvent(new window.Event("input"));
+$("wk-browser-save").click();
+await wait(600);
+ok("save browser settings", /Chrome|Saved/.test($("wk-browser-status").textContent), $("wk-browser-status").textContent);
+$("wk-browser-detect").click();
+await wait(400);
+ok("detect browser", $("wk-browser-status").textContent.includes("Google Chrome"));
+
+window.document.querySelector('.nav-button[data-tab="show"]').click();
+window.document.querySelector('[data-subpanel="show-site"]').click();
+const readyCard = [...window.document.querySelectorAll(".site-card")].find((c) => c.dataset.site === "omezy");
+readyCard.querySelector("input").dispatchEvent(new window.Event("change"));
+await wait(300);
+$("site-browser-check").click();
+await wait(1400);
+ok("browser check verdict", $("site-browser-status").textContent.includes("PASS"), $("site-browser-status").textContent);
+ok("browser check reports screenshot", $("site-browser-status").textContent.includes(".png"), $("site-browser-status").textContent);
+ok("browser check shows phase", $("site-browser-status").textContent.includes("phase="), $("site-browser-status").textContent);
+
 // worker: selection + accounts
 window.document.querySelector('.nav-button[data-tab="worker"]').click();
 await wait(200);

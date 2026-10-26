@@ -39,6 +39,8 @@ type App struct {
 	startedAt time.Time
 
 	httpClient *http.Client
+
+	drivers map[string]*DriverSession
 }
 
 // New wires the app: load the registry, open the store, seed the log.
@@ -67,6 +69,7 @@ func New(dataDir, sitesDir, kind string) (*App, error) {
 		lastTests:  map[string]TestResult{},
 		latencies:  map[string][]int{},
 		httpClient: &http.Client{Timeout: 8 * time.Second},
+		drivers:    map[string]*DriverSession{},
 	}
 
 	app.logf("system", fmt.Sprintf("console started · %d sites · backend %s", len(sites), kind), Version, "")
@@ -464,6 +467,7 @@ func (a *App) StopRun() (map[string]any, error) {
 	if cancel != nil {
 		cancel()
 	}
+	a.closeAllDrivers()
 	if wasRunning {
 		a.logf("system", "run stopped by user", "runner", "")
 	}
@@ -473,65 +477,6 @@ func (a *App) StopRun() (map[string]any, error) {
 // runJob is the Step-2 job engine: it walks the configured sequence per site and
 // logs every step, honouring the configured pacing and the stop signal.
 // Step 4 replaces the pacing/logging body with the real DOM driver per site.
-func (a *App) runJob(ctx context.Context, mode string, siteIDs []string, profile string) {
-	defer func() {
-		a.mu.Lock()
-		a.running, a.runMode = false, ""
-		a.mu.Unlock()
-		a.logf("system", "run finished", "runner", "")
-	}()
-
-	settings := a.store.Get()
-	defaultLines := splitLines(settings.Message.Sequence)
-	if len(defaultLines) == 0 {
-		defaultLines = []string{"hello there"}
-	}
-
-	for _, siteID := range siteIDs {
-		site, _ := FindSite(a.sites, siteID)
-		if !site.Enabled {
-			a.logf("skip", fmt.Sprintf("%s is disabled in site.json", site.Name), "registry", siteID)
-			continue
-		}
-		if !a.sleep(ctx, 700*time.Millisecond) {
-			return
-		}
-		a.logf("system", fmt.Sprintf("opening %s (%s · %s)", site.Name, site.Family, site.AccountMode), site.ID+"/site.json", siteID)
-		a.logf("system", fmt.Sprintf("onboarding: %s", fallback(site.EntryFlow, "guest entry")), "auto-onboard", siteID)
-
-		lines := defaultLines
-		if settings.Message.Strategy == "folder" {
-			if fromFile := a.sequenceForSite(siteID); len(fromFile) > 0 {
-				lines = fromFile
-				a.logf("system", fmt.Sprintf("folder strategy: %d line(s) from data/sequences", len(fromFile)), "sequences", siteID)
-			} else {
-				a.logf("skip", "folder strategy but data/sequences is empty · using inline sequence", "sequences", siteID)
-			}
-		}
-
-		if !a.sleep(ctx, a.pace(settings, mode)) {
-			return
-		}
-		for i, line := range lines {
-			if i >= settings.Message.MaxLines {
-				break
-			}
-			a.logf("out", line, fmt.Sprintf("line %d/%d · %s", i+1, len(lines), settings.Message.Strategy), siteID)
-			if !a.sleep(ctx, a.pace(settings, mode)) {
-				return
-			}
-			if i == 0 {
-				a.logf("in", "hey, how's it going?", "partner reply", siteID)
-			}
-		}
-		a.mu.Lock()
-		a.stats.Completed++
-		a.mu.Unlock()
-		a.logf("skip", "closing chat and rotating", "next target", siteID)
-	}
-}
-
-// pace returns the delay between steps for the mode (seconds, min 1s for the demo).
 func (a *App) pace(settings Settings, mode string) time.Duration {
 	lo, hi := settings.Worker.ActionMin, settings.Worker.ActionMax
 	if mode == "show" {
@@ -570,17 +515,104 @@ func (a *App) LaunchLogin(siteID, profile string) (map[string]any, error) {
 	if profile == "" {
 		profile = "default"
 	}
-	dir := filepath.Join(a.sitesDir, site.ID, "profiles", profile)
+	dir := a.profilePath(site.ID, profile)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("prepare profile dir: %w", err)
 	}
-	a.logf("system", fmt.Sprintf("login window requested for %s (profile %s)", site.Name, profile), "browser", siteID)
-	a.logf("skip", "browser driver is wired in step 4 — no window opened yet", "scaffold", siteID)
-	return map[string]any{"ok": true, "message": "login queued", "profile_dir": dir}, nil
+
+	settings := a.store.Get()
+	status := DiscoverBrowser(settings.Browser.Path)
+	if !status.Found {
+		a.logf("error", "cannot open a login window: "+status.Note, "browser", siteID)
+		return nil, fmt.Errorf("%s", status.Note)
+	}
+
+	// visible window on purpose: the user logs in / solves a captcha by hand
+	proc, err := LaunchBrowser(LaunchOptions{
+		ExecPath:   status.Path,
+		ProfileDir: dir,
+		StartURL:   site.StartURL,
+		Headless:   false,
+	}, false)
+	if err != nil {
+		a.logf("error", "login window failed: "+err.Error(), "browser", siteID)
+		return nil, err
+	}
+
+	pid := 0
+	if proc.cmd != nil && proc.cmd.Process != nil {
+		pid = proc.cmd.Process.Pid
+	}
+	a.logf("system", fmt.Sprintf("login window opened for %s · profile %s · pid %d", site.Name, profile, pid), "browser", siteID)
+	a.logf("skip", "finish the login in the window, then press Save Session", "browser", siteID)
+
+	return map[string]any{
+		"ok":          true,
+		"message":     "login window opened",
+		"profile_dir": dir,
+		"pid":         pid,
+		"browser":     status.Name,
+	}, nil
 }
 
-// AutoRegisterAccounts creates count identities inside sites/<id>/accounts/.
-// No browser is involved: it writes the session files the driver will later use.
+// GetBrowserStatus reports what the console can drive.
+func (a *App) GetBrowserStatus() BrowserStatus {
+	settings := a.store.Get()
+	return DiscoverBrowser(settings.Browser.Path)
+}
+
+// SaveSessionFromBrowser writes a session marker from the profile folder that a
+// login window just produced (cookies are owned by the browser, not by us).
+func (a *App) SaveSessionFromBrowser(siteID, profile, note string) (SiteSession, error) {
+	site, ok := FindSite(a.sites, siteID)
+	if !ok {
+		return SiteSession{}, fmt.Errorf("unknown site %q", siteID)
+	}
+	if profile == "" {
+		profile = "default"
+	}
+	dir := a.profilePath(site.ID, profile)
+	cookies := countCookieFiles(dir)
+	if note == "" {
+		note = "saved from the login window"
+	}
+	session, err := SaveSession(a.sitesDir, siteID, profile, map[string]any{
+		"cookies":     cookies,
+		"http_status": 200,
+		"note":        note,
+		"status":      boolStatus(cookies > 0, "logged-in", "profile-only"),
+	})
+	if err != nil {
+		return session, err
+	}
+	a.logf("system", fmt.Sprintf("%s: session saved for %q (%d cookie file(s))", siteID, profile, cookies), "sessions", siteID)
+	return session, nil
+}
+
+func countCookieFiles(profileDir string) int {
+	// Chrome keeps the cookie DB in <profile>/Default/. Count what exists so the
+	// UI can tell "profile created" from "profile with a real login".
+	candidates := []string{
+		filepath.Join(profileDir, "Default", "Cookies"),
+		filepath.Join(profileDir, "Default", "Network", "Cookies"),
+		filepath.Join(profileDir, "Default", "Local Storage"),
+	}
+	count := 0
+	for _, candidate := range candidates {
+		if info, err := os.Stat(candidate); err == nil && info.Size() > 0 {
+			count++
+		}
+	}
+	return count
+}
+
+func boolStatus(ok bool, whenTrue, whenFalse string) string {
+	if ok {
+		return whenTrue
+	}
+	return whenFalse
+}
+
 func (a *App) AutoRegisterAccounts(siteID string, count int) ([]Account, error) {
 	site, ok := FindSite(a.sites, siteID)
 	if !ok {

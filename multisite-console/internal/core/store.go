@@ -84,6 +84,8 @@ func (s *Store) Apply(section string, values json.RawMessage) (Settings, error) 
 		target = &candidate.Proxy
 	case "accounts":
 		target = &candidate.Accounts
+	case "browser":
+		target = &candidate.Browser
 	default:
 		return s.settings, fmt.Errorf("unknown settings section %q", section)
 	}

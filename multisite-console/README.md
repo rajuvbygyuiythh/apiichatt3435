@@ -53,6 +53,14 @@ sites/<id>/                    the 5 sites: site.json, dom_driver.js, *_protecti
 data/                          runtime: settings.json, sequences/, (accounts are per-site)
 ```
 
+## Step 4 surface (real browser driver)
+
+- `GET /api/GetBrowserStatus` — which Chrome/Edge/Chromium the console will drive, or why none.
+- `POST /api/TestSiteBrowser` — headless open + driver install + DOM snapshot + PNG screenshot.
+- `POST /api/LaunchLogin` — **opens a real visible browser** with that site's profile folder.
+- `StartRun` drives real pages over the DevTools protocol; `StopRun` also kills the browsers.
+- No browser on the machine → the run says `SIMULATION` in the log, never fakes success.
+
 ## Step 3 surface (diagnostics · sessions · file log)
 
 - `GET /api/GetSiteDiagnostics?id=<site>` — 8–9 pass/fail checks, 11-selector coverage,

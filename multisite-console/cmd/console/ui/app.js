@@ -27,6 +27,9 @@
 //    GetSessions({site_id})                         -> {site_id, sessions:[…], count}
 //    SaveSession({site_id, profile, values})        -> SiteSession
 //    DeleteSession({site_id, profile})              -> {ok}
+//  Step-4 additions:
+//    GetBrowserStatus()                             -> {found, path, name, source, version, note}
+//    TestSiteBrowser({site_id, profile})            -> {ok, probe, phase, has_input, protection, screenshot}
 // =============================================================================
 
 const CONFIG = {
@@ -319,6 +322,15 @@ function readMessage(prefix) {
   };
 }
 
+function readBrowserSettings() {
+  return {
+    path: text("wk-browser-path"),
+    headless: checked("wk-browser-headless"),
+    page_timeout_ms: num("wk-page-timeout"),
+    keep_profile: checked("wk-keep-profile"),
+  };
+}
+
 function readWorkerSettings() {
   return {
     sites: state.selectedSites.slice(),
@@ -400,6 +412,13 @@ function applySnapshot(snapshot) {
   setValue("wk-concurrency", worker.concurrency ?? 1);
   setValue("wk-profile", worker.profile || "default");
   setValue("wk-headless", worker.headless);
+
+  // Browser driver (step 4)
+  const browser = s.browser || {};
+  setValue("wk-browser-path", browser.path || "");
+  setValue("wk-browser-headless", browser.headless !== false, true);
+  setValue("wk-page-timeout", browser.page_timeout_ms || 45000);
+  setValue("wk-keep-profile", browser.keep_profile !== false, true);
 
   // Proxy
   const proxy = s.proxy || {};
@@ -803,6 +822,58 @@ function renderAccountsTable() {
 // ---------------------------------------------------------------------------
 // Actions
 // ---------------------------------------------------------------------------
+function renderBrowserStatus(status) {
+  const line = byId("wk-browser-status");
+  if (!line || !status) return;
+  if (status.found) {
+    line.textContent = `${status.name} · ${status.version || "version unknown"} · ${status.source}`;
+    line.className = "status-line ok";
+    if (byId("wk-browser-path") && !byId("wk-browser-path").value) {
+      byId("wk-browser-path").placeholder = status.path;
+    }
+  } else {
+    line.textContent = status.note || "No browser found.";
+    line.className = "status-line error";
+  }
+}
+
+async function detectBrowser(showToast) {
+  try {
+    const status = await bridge.invoke("GetBrowserStatus");
+    renderBrowserStatus(status);
+    if (showToast) toast(status.found ? `${status.name} detected` : "No browser found", status.found ? "ok" : "error");
+    return status;
+  } catch (error) {
+    const line = byId("wk-browser-status");
+    if (line) { line.textContent = error.message || String(error); line.className = "status-line error"; }
+    return null;
+  }
+}
+
+async function saveBrowserSettings() {
+  await saveSection("browser", readBrowserSettings(), "wk-browser-status");
+  await detectBrowser(false);
+}
+
+async function browserCheck() {
+  const siteID = state.selectedSite;
+  if (!siteID) { setStatus("site-browser-status", "Select a site first.", "error"); return; }
+  const line = byId("site-browser-status");
+  line.textContent = "Opening a real browser… (can take ~20s)";
+  line.className = "status-line";
+  try {
+    const out = await bridge.invoke("TestSiteBrowser", { site_id: siteID, profile: "default" });
+    const verdict = out.ok ? "PASS" : "NO COMPOSER";
+    line.textContent = `${verdict} · phase=${out.phase} · messages=${out.messages} · ${out.probe || ""}` +
+      (out.screenshot ? ` · shot: ${out.screenshot}` : "");
+    line.className = "status-line " + (out.ok ? "ok" : "skip");
+    await refreshSnapshot(true, true);
+  } catch (error) {
+    line.textContent = error.message || String(error);
+    line.className = "status-line error";
+  }
+}
+
 async function refreshSnapshot(silent, force) {
   try {
     const snapshot = await bridge.invoke("GetSnapshot");
@@ -1111,6 +1182,7 @@ async function clearLogs(prefix) {
 async function hydrateStep3() {
   await loadDiagnostics(state.selectedSite, true);
   await loadSessions(true);
+  await detectBrowser(false);
 }
 function bindForms() {
   byId("theme-select").value = localStorage.getItem("kit-theme") || CONFIG.theme;
@@ -1136,6 +1208,7 @@ function bindActions() {
   // Show mode
   byId("site-test").addEventListener("click", testSelectedSite);
   byId("site-diag-refresh").addEventListener("click", () => loadDiagnostics(state.selectedSite));
+  byId("site-browser-check").addEventListener("click", browserCheck);
   byId("show-log-site").addEventListener("change", () => renderLogs("show"));
   byId("worker-log-site").addEventListener("change", () => renderLogs("worker"));
   byId("sess-refresh").addEventListener("click", () => loadSessions(false));
@@ -1157,6 +1230,8 @@ function bindActions() {
   byId("wk-save").addEventListener("click", () => saveSection("worker", readWorkerSettings(), "wk-status"));
   byId("wk-proxy-save").addEventListener("click", () => saveSection("proxy", readProxy(), "wk-proxy-status"));
   byId("wk-proxy-test").addEventListener("click", testProxy);
+  byId("wk-browser-save").addEventListener("click", saveBrowserSettings);
+  byId("wk-browser-detect").addEventListener("click", () => detectBrowser(true));
   byId("worker-start").addEventListener("click", startWorker);
   byId("worker-stop").addEventListener("click", stopRun);
   byId("worker-refresh").addEventListener("click", () => refreshSnapshot(false, true).catch(() => {}));
